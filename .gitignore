@@ -1,7 +1,7 @@
 ./data/nuScene-mini
 ./data/argoverse_train
-**/.sublime-project
-**/.sublime-workspace
+*.sublime-project
+*.sublime-workspace
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
