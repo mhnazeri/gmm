@@ -1,7 +1,6 @@
-./data/nuScene-mini/
-./data/nuScene-mini/*
-./data/argoverse_train/
-./data/argoverse_train/*
+data/nuScene-mini/
+data/argoverse_train/
+*.mp4
 *.sublime-project
 *.sublime-workspace
 # Byte-compiled / optimized / DLL files

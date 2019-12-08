@@ -15,6 +15,7 @@ import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.data_classes import LidarPointCloud
+from nuscenes.utils.geometry_utils import view_points, box_in_image, BoxVisibility, transform_matrix
 from pyquaternion import Quaternion
 
 
@@ -50,7 +51,7 @@ def scene_sensor_data(nusc, scene_number=0, sensor="LIDAR_TOP", verbose=True):
         return sensor_data
 
 def sample_token_extractor(nusc, idx_scene):
-    """returns t sample frame from scene idx"""
+    """returns sample frames from scene idx"""
     sample = nusc.get("sample", nusc.scene[idx_scene]["first_sample_token"])
     _frames = []
     while sample["next"] != "":
@@ -64,13 +65,14 @@ def sample_token_extractor(nusc, idx_scene):
 
 
 def update(frames):
-    data = view_points(frames.points[:3,:], np.eye(4))
+    data = _view_points(frames.points[:3,:], np.eye(4))
     xdata = data[0, :]
     ydata = data[1, :]
     ln.set_data(xdata, ydata)
     return ln,
 
-def view_points(points, view):
+
+def _view_points(points, view):
     assert view.shape[0] <= 4
     assert view.shape[1] <= 4
     assert points.shape[0] == 3
@@ -112,29 +114,25 @@ if __name__ == "__main__":
     nusc = load_dataset(root, verbose=False)
     scene_data = scene_sensor_data(nusc, 1, verbose=False)
     samples = sample_token_extractor(nusc, 0)
-    print(len(samples))
-    print(nusc.get("sample_annotation", samples[0]["anns"][1]))
-    # fig, ax = plt.subplots()
-    # ln, = plt.plot([], [], "b.", markersize=1)
-    # render_scene_lidar(0, fig, ax, ln, save_path="scene")
-    # print(nusc.get("sample", nusc.scene[0]["first_sample_token"]))
-    # nusc.render_annotation([nusc.get("sample_annotation", token) for token in nusc.get("sample", nusc.scene[0]["first_sample_token"])["anns"]][0]["token"])
+    ann = nusc.get("sample_annotation", samples[0]["anns"][10])
+    pos = []
+    sample_token = []
+    ann_tokens = []
+    while ann["next"] != "":
+        pos.append(ann["translation"])
+        ann_tokens.append(ann["token"])
+        sample_token.append(nusc.get("sample", ann["sample_token"]))
+        ann = nusc.get("sample_annotation", ann["next"])
+
+
+
+
+    pos = zip(pos[:-1], pos[1:])
+    # # print(list(pos))
+    pos = np.array(list(pos), dtype=np.float64)
+
+    # for token in pos_token:
+    #     nusc.render_annotation(token)
+    # print(pos)
+    # plt.scatter(pos[:,0,0], pos[:,1,2])
     plt.show()
-
-
-    # print(len(obs_frames), len(pred_frames), i)
-    # print(obs_frames[0][0])
-    # print(nusc.sample_annotation[0])
-    # nusc.render_annotation(obs_frames[0][0]["anns"][0])
-    # print([len(x) for x in obs_frames])
-    # print([len(x) for x in pred_frames])
-    # print(len(scene_data))
-    # nusc.render_pointcloud_in_image(scene_data[0]["sample_token"])
-    # nusc.render_scene(nusc.scene[1]["token"])
-    # nusc.render_pointcloud_in_image(scene_data[3]["sample_token"])
-    # nusc.render_pointcloud_in_image(scene_data[7]["sample_token"])
-    # nusc.render_pointcloud_in_image(scene_data[11]["sample_token"])
-    # lidar.render_height(ax=ax[0])
-    # lidar.render_intensity(ax=ax[1])
-    # print(len(scene_data))
-    # print(lidar.points.shape)
