@@ -8,14 +8,9 @@ import os
 import logging
 import json
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
-from nuscenes.utils.data_classes import LidarPointCloud
 from traj_viz import render_scene_lidar
 
 
@@ -51,7 +46,7 @@ def scene_sensor_data(nusc, scene_number=0, sensor="LIDAR_TOP", only_tokens=Fals
         return sensor_data
 
 
-def sample_token_extractor(nusc, idx_scene):
+def sample_extractor(nusc, idx_scene):
     """returns sample frames from scene idx"""
     sample = nusc.get("sample", nusc.scene[idx_scene]["first_sample_token"])
     _frames = []
@@ -64,79 +59,91 @@ def sample_token_extractor(nusc, idx_scene):
 
     return _frames
 
+def _sample_annotations(nusc, instance):
+    sample_annotation = nusc.get("sample_annotation", instance)
+    annotation = []
+    while sample_annotation["next"] != "":
+        annotation.append({"translation": sample_annotation["translation"],
+                        "rotation": sample_annotation["rotation"],
+                        "size": sample_annotation["size"],
+                        "visibility": sample_annotation["visibility_token"],
+                        "category": sample_annotation["category_name"],
+                        "instance_token": sample_annotation["instance_token"],
+                        "sample_token": sample_annotation["sample_token"]})
+
+        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+
+    return annotation
+
 
 def extract_scene_data_as_json(nusc, scene_idx, path=None):
-    """Write scene data as json file in to given path"""
+    """Write scene data as json file in to given path
+    args:
+        Nuscene nusc: Nuscene dataset
+        int scene_idx: index of the desired scene
+        str path: where to save the json file"""
     name = nusc.scene[scene_idx]["name"]
-    scene_data = scene_sensor_data(nusc, scene_idx, only_tokens=False)
-    print(len(scene_data))
+    scene = nusc.scene[scene_idx]
+    scene_data = sample_extractor(nusc, scene_idx)
     info_list = []
+    extract = lambda table, token: nusc.get(table, token)
+    instance_tokens = []
+    agents = {}
+    # print(scene_data)
+    for i, token in enumerate(scene_data[0]["anns"]):
+            agent = _sample_annotations(nusc, token)
+            for value in agent:
+                if value["instance_token"] not in instance_tokens:
+                    instance_tokens.append(value["instance_token"])
+                    agents[f"agent_{i}"] = agent
+
     for idx, sample in enumerate(scene_data):
-        annotations = nusc.get("sample", sample["sample_token"])["anns"]
+        # all annotations of the sample
+        # sample_annotations = sample["anns"]
+        # retreive each agent position in the scene, the length may vary
+        # agents = {f"agent_{i}": _sample_annotations(nusc, token) for i, token in enumerate(sample["anns"])}
+
+        sample_data = nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
         info = {"id_sample": idx,
-                "token":sample["token"],
-                "ego_pose_translation": nusc.get("ego_pose", sample["ego_pose_token"])["translation"],
-                "ego_pose_rotation": nusc.get("ego_pose", sample["ego_pose_token"])["rotation"],
-                "timestamp": sample["timestamp"],
-                "filename": sample["filename"],
-                "channel": sample["channel"],
-                "annotations": [{"token": nusc.get("sample_annotation", ann)["token"],
-                                "sample_token": nusc.get("sample_annotation", ann)["sample_token"],
-                                "category": nusc.get("sample_annotation", ann)["category_name"],
-                                "translation": nusc.get("sample_annotation", ann)["translation"],
-                                "rotation": nusc.get("sample_annotation", ann)["rotation"],
-                                "size": nusc.get("sample_annotation", ann)["size"],} for ann in annotations]}
+                "token": sample_data["token"],
+                "sample_token": sample_data["sample_token"],
+                "ego_pose_translation": extract("ego_pose", sample_data["ego_pose_token"])["translation"],
+                "ego_pose_rotation": extract("ego_pose", sample_data["ego_pose_token"])["rotation"],
+                "timestamp": sample_data["timestamp"],
+                "filename": sample_data["filename"],
+                "channel": sample_data["channel"]}
 
         info_list.append(info)
+        # for info in info_list:
+        #     for j in range(len(info_list)):
+        #         if info[]
+        # info_list.append(agents)
+    info_list.append(agents)
 
-    if os.path.exists(path):
-        with open(os.path.join(path, name) + ".json", "w") as f:
-            f.write(json.dumps(info_list))
+    # info_list.append(agents)
+    # for i in range(len(info_list)):
+    #     for key, value in info_list[i][agents]:
+    #         for token in value:
+    #             if token["instance_token"]
+
+    if path:
+        if os.path.exists(path):
+            with open(os.path.join(path, name) + ".json", "w") as f:
+                f.write(json.dumps(info_list))
+        else:
+            os.mkdir(path)
+            with open(os.path.join(path, name) + ".json", "w") as f:
+                f.write(json.dumps(info_list))
+
     else:
-        os.mkdir(path)
-        with open(os.path.join(path, name) + ".json", "w") as f:
-            f.write(json.dumps(info_list))
-    # print(nusc.field2token("scene", "first_sample_token", sample[0]["sample_token"]))
-    # print(len(sample))
+        return info_list
 
 
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    # scene_data = scene_sensor_data(nusc, 1, only_tokens=False)
-    # print(nusc.get("calibrated_sensor", scene_data[1]["calibrated_sensor_token"]))
-    # sample = nusc.get("sample", scene_data[1]["sample_token"])
-    # l = nusc.get("sample_annotation", sample["anns"][25])
-    # print(l)
-    # print(scene_data[1])
-    # samples = sample_token_extractor(nusc, 1)
+    frames = sample_extractor(nusc, 1)
+    # print(len(frames[0]["anns"]))
+    # print(nusc.get("sample_data", frames[0]["data"]["LIDAR_TOP"]))
     for idx in range(len(nusc.scene)):
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
-    # scene_info = nusc.scene[1]
-    # print(nusc.get("sample_data", samples[0]["data"]["LIDAR_TOP"]))
-    # print(nusc.get("sample_data", scene_data[0]))
-    # print(scene_data[0])
-    # ann = nusc.get("sample_annotation", samples[0]["anns"][10])
-    # pos = []
-    # sample_token = []
-    # ann_tokens = []
-    # while ann["next"] != "":
-    #     pos.append(ann["translation"])
-    #     ann_tokens.append(ann["token"])
-    #     sample_token.append(nusc.get("sample", ann["sample_token"]))
-    #     ann = nusc.get("sample_annotation", ann["next"])
-
-
-
-
-    # pos = list(zip(pos[:-1], pos[1:]))
-    # pos = np.array(pos, dtype=np.float64)
-    # print(pos)
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # plt.scatter(pos[:,0], pos[:, 1], pos[: 2])
-    # for token in ann_tokens:
-        # nusc.render_annotation(token)
-    # print(render)
-    # plt.scatter(pos[:,0,0], pos[:,1,2])
-    # plt.show()
