@@ -89,20 +89,20 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     extract = lambda table, token: nusc.get(table, token)
     instance_tokens = []
     agents = {}
-    # print(scene_data)
-    for i, token in enumerate(scene_data[0]["anns"]):
+
+    for j in range(len(scene_data)):
+        for i, token in enumerate(scene_data[j]["anns"]):
             agent = _sample_annotations(nusc, token)
-            for value in agent:
-                if value["instance_token"] not in instance_tokens:
-                    instance_tokens.append(value["instance_token"])
-                    agents[f"agent_{i}"] = agent
+            if len(agent) == 0:
+                continue
+            # for value in agent:
+            if agent[0]["instance_token"] in instance_tokens:
+                continue
+            else:
+                instance_tokens.append(agent[0]["instance_token"])
+                agents[f"agent_{i}"] = agent
 
     for idx, sample in enumerate(scene_data):
-        # all annotations of the sample
-        # sample_annotations = sample["anns"]
-        # retreive each agent position in the scene, the length may vary
-        # agents = {f"agent_{i}": _sample_annotations(nusc, token) for i, token in enumerate(sample["anns"])}
-
         sample_data = nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
         info = {"id_sample": idx,
                 "token": sample_data["token"],
@@ -111,21 +111,11 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
                 "ego_pose_rotation": extract("ego_pose", sample_data["ego_pose_token"])["rotation"],
                 "timestamp": sample_data["timestamp"],
                 "filename": sample_data["filename"],
-                "channel": sample_data["channel"]}
+                "channel": sample_data["channel"],}
 
         info_list.append(info)
-        # for info in info_list:
-        #     for j in range(len(info_list)):
-        #         if info[]
-        # info_list.append(agents)
+
     info_list.append(agents)
-
-    # info_list.append(agents)
-    # for i in range(len(info_list)):
-    #     for key, value in info_list[i][agents]:
-    #         for token in value:
-    #             if token["instance_token"]
-
     if path:
         if os.path.exists(path):
             with open(os.path.join(path, name) + ".json", "w") as f:
@@ -142,8 +132,5 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    frames = sample_extractor(nusc, 1)
-    # print(len(frames[0]["anns"]))
-    # print(nusc.get("sample_data", frames[0]["data"]["LIDAR_TOP"]))
     for idx in range(len(nusc.scene)):
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
