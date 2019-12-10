@@ -8,6 +8,9 @@ import os
 import logging
 import json
 import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
@@ -128,9 +131,24 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     else:
         return info_list
 
+def get_color(category_name: str):
+        """
+        Provides the default colors based on the category names.
+        This method works for the general nuScenes categories, as well as the nuScenes detection categories.
+        """
+        if 'bicycle' in category_name or 'motorcycle' in category_name:
+            return 255, 61, 99  # Red
+        elif 'vehicle' in category_name or category_name in ['bus', 'car', 'construction_vehicle', 'trailer', 'truck']:
+            return 255, 158, 0  # Orange
+        elif 'pedestrian' in category_name:
+            return 0, 0, 230  # Blue
+        elif 'cone' in category_name or 'barrier' in category_name:
+            return 0, 0, 0  # Black
+        else:
+            return 255, 0, 255  # Magenta
+
 
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    for idx in range(len(nusc.scene)):
-        extract_scene_data_as_json(nusc, idx, "exported_json_data")
+    render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
