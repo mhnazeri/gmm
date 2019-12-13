@@ -18,27 +18,6 @@ ln, = plt.plot([], [], "b.", markersize=1)
 nusc = NuScenes(version="v1.0-mini", dataroot="nuScene-mini")
 
 
-def scene_sensor_data(nusc, scene_number=0, sensor="LIDAR_TOP", only_tokens=True):
-    """return information of a specific scene
-    only_tokens: if set to True return the sensor tokens"""
-    sample = nusc.get("sample", nusc.scene[scene_number]["first_sample_token"])
-    scene_data = []
-    scene_data.append(sample["data"][sensor])
-    while sample["next"] != "":
-        sample = nusc.get("sample", sample["next"])
-        scene_data.append(sample["data"][sensor])
-
-    scene_data = list(dict.fromkeys(scene_data))
-    if only_tokens:
-        return scene_data
-    else:
-        sensor_data = []
-        for idx in range(len(scene_data)):
-            sensor_data.append(nusc.get("sample_data", scene_data[idx]))
-
-        return sensor_data
-
-
 def sample_extractor(nusc, idx_scene):
     """returns sample frames from scene idx"""
     sample = nusc.get("sample", nusc.scene[idx_scene]["first_sample_token"])
