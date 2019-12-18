@@ -47,9 +47,9 @@ def sample_extractor(nusc, idx_scene):
 def _sample_annotations(nusc, instance):
     sample_annotation = nusc.get("sample_annotation", instance)
     annotation = []
-    while sample_annotation["next"] != "":
-        movable = 0 if sample_annotation["category_name"] in \
+    movable = 0 if sample_annotation["category_name"].split(".")[-1] in \
          "barrier debris pushable_pul trafficcone bicycle_rack" else 1
+    while sample_annotation["next"] != "":
         annotation.append({"translation": sample_annotation["translation"],
                         "rotation": sample_annotation["rotation"],
                         "size": sample_annotation["size"],
@@ -59,7 +59,7 @@ def _sample_annotations(nusc, instance):
                         "sample_token": sample_annotation["sample_token"],
                         "timestamp": nusc.get("sample", sample_annotation["sample_token"])["timestamp"],
                         "movable": movable,
-                        "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()})
+                        "velocity": nusc.box_velocity(sample_annotation["token"]).tolist() if movable  else [0., 0., 0.]})
 
         sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
 
