@@ -16,6 +16,7 @@ import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
 from traj_viz import render_scene_lidar
+import imageio
 
 
 
@@ -103,6 +104,7 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
                 "sample_token": sample_data["sample_token"],
                 "ego_pose_translation": extract("ego_pose", sample_data["ego_pose_token"])["translation"],
                 "ego_pose_rotation": extract("ego_pose", sample_data["ego_pose_token"])["rotation"],
+                "ego_pose_velocity": ego_velocity(nusc, sample["data"]["LIDAR_TOP"]).tolist(),
                 "timestamp": sample_data["timestamp"],
                 "lidar": sample_data["filename"],
                 "camera": camera_front["filename"]}
@@ -123,9 +125,65 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
         return info_list
 
 
+def ego_velocity(nusc, sample_frame_token: str, max_time_diff: float = 1.5) -> np.ndarray:
+        """
+        Estimate the velocity for ego-vehicle.
+        If possible, we compute the centered difference between the previous and next frame.
+        Otherwise we use the difference between the current and previous/next frame.
+        If the velocity cannot be estimated, values are set to np.nan.
+        :param sample_annotation_token: Unique sample_annotation identifier.
+        :param max_time_diff: Max allowed time diff between consecutive samples that are used to estimate velocities.
+        :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
+        """
+
+        current = nusc.get('sample_data', sample_frame_token)
+        has_prev = current['prev'] != ''
+        has_next = current['next'] != ''
+
+        # Cannot estimate velocity for a single annotation.
+        if not has_prev and not has_next:
+            return np.array([np.nan, np.nan, np.nan])
+
+        if has_prev:
+            first = nusc.get('sample_data', current['prev'])
+        else:
+            first = current
+
+        if has_next:
+            last = nusc.get('sample_data', current['next'])
+        else:
+            last = current
+
+        pos_last = np.array(nusc.get("ego_pose", last["ego_pose_token"])['translation'])
+        pos_first = np.array(nusc.get("ego_pose", first["ego_pose_token"])['translation'])
+        pos_diff = pos_last - pos_first
+
+        time_last = 1e-6 * nusc.get("ego_pose", last["ego_pose_token"])['timestamp']
+        time_first = 1e-6 * nusc.get("ego_pose", first["ego_pose_token"])['timestamp']
+        time_diff = time_last - time_first
+
+        if has_next and has_prev:
+            # If doing centered difference, allow for up to double the max_time_diff.
+            max_time_diff *= 2
+
+        if time_diff > max_time_diff:
+            # If time_diff is too big, don't return an estimate.
+            return np.array([np.nan, np.nan, np.nan])
+        else:
+            return pos_diff / time_diff
+
+
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
     # render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
     for idx in range(len(nusc.scene)):
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
+    # im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
+    # im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
+
+    # # plt.imshow(im)
+    # print("image 1: ", im.shape)
+    # print("image 2: ", im_2.shape)
+    # plt.imshow(im_2)
+    # plt.show()
