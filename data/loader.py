@@ -79,7 +79,7 @@ def create_feature_matrix(file):
     datum = torch.cat((ego, agents), 0)
     # datum = torch.transpose(datum, 1, 0)
 
-    return datum
+    return datum.view(-1, 14)
 
 
 class CAEDataset(Dataset):
@@ -98,7 +98,7 @@ class CAEDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        sample = self.scene_frames[idx,:]
+        sample = self.scene_frames[idx]
         # img_name = os.path.join(self.root_dir,
         #                         self.camera_address[idx])
         # lidar_name = os.path.join(self.root_dir,
@@ -131,5 +131,6 @@ class CAEDataset(Dataset):
 # data = create_feature_matrix("exported_json_data/scene-1100.json")
 # print(data.shape)
 # data = CAEDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/data/nuScene-mini")
+# print(len(data))
 # print(len(data.lidar_address))
 # print(data[0][14 * 1:14 * 2].reshape(-1, 14).shape)
