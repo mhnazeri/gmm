@@ -18,26 +18,20 @@ def read_file(file: str, feature: str = None):
     appears = []
 
     for i in range(len(data[-1])):
-        # agent_traj = []
         for j in range(len(data) - 1):
             if data[j]["sample_token"] == data[-1][f"agent_{i}"][0]["sample_token"]:
-                appears.append((f"agent_{i}", data[j]["frame_id"],
-                                 (data[j]["frame_id"] + len(data[-1][f"agent_{i}"]))))
+                appears.append(
+                    (
+                        f"agent_{i}",
+                        data[j]["frame_id"],
+                        (data[j]["frame_id"] + len(data[-1][f"agent_{i}"])),
+                    )
+                )
 
     if feature:
         return data, features, appears
 
     return data, appears
-
-
-# def collate_fn(batch):
-#     # batch = torch.transpose(batch, 1, 0)
-#     print(len(batch))
-#     len_batch = 14
-#     # for i in range(40):
-#     #     samples.append(batch[])
-#     # samples = (batch[::40,],)
-#     return torch.tensor(batch), len_batch
 
 
 def create_feature_matrix(file):
@@ -58,7 +52,9 @@ def create_feature_matrix(file):
             agent_data.extend([datum[-1][key][i]["movable"]])
             # print(f"{key}, start: {start}, stop: {stop}")
             # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
-            agents[num, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.double)
+            agents[
+                num, (start * 14) + (i * 14) : (start + 1) * 14 + (i * 14)
+            ] = np.array(agent_data, dtype=np.double)
         num += 1
 
     for id in range(num_frames):
@@ -72,12 +68,13 @@ def create_feature_matrix(file):
 
     else:
         for i in range(40 - num_frames):
-            ego.extend([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+            ego.extend(
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            )
 
     ego = torch.tensor(ego, dtype=torch.double).reshape(-1, 560)
     agents = torch.from_numpy(agents)
     datum = torch.cat((ego, agents), 0)
-    # datum = torch.transpose(datum, 1, 0)
 
     return datum.view(-1, 14)
 
@@ -85,10 +82,17 @@ def create_feature_matrix(file):
 class CAEDataset(Dataset):
     """Scene frames dataset."""
 
-    def __init__(self, json_file, root_dir, transform=None):
-        self.scene_frames = create_feature_matrix(json_file)
-        # self.lidar_address, self.camera_address = self.read_file(json_file)
+    def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
+        print(self.root_dir)
+        json_files = os.listdir(root_dir)
+        # self.scene_frames = torch.zeros(560, 14, dtype=torch.double)
+        self.scene_frames = create_feature_matrix(os.path.join(self.root_dir, json_files[0]))
+        for file in json_files[1:]:
+            self.scene_frames = torch.cat((self.scene_frames, create_feature_matrix(os.path.join(self.root_dir, file))))
+
+        # self.lidar_address, self.camera_address = self.read_file(json_file)
+
         self.transform = transform
 
     def __len__(self):
@@ -130,7 +134,7 @@ class CAEDataset(Dataset):
 
 # data = create_feature_matrix("exported_json_data/scene-1100.json")
 # print(data.shape)
-# data = CAEDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/data/nuScene-mini")
+# data = CAEDataset("exported_json_data")
 # print(len(data))
 # print(len(data.lidar_address))
 # print(data[0][14 * 1:14 * 2].reshape(-1, 14).shape)
