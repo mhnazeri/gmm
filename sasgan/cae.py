@@ -115,7 +115,8 @@ def make_cae(
 
         losses.append(loss)
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
-        torch.save(encoder.state_dict(), f"./models/model_{e}.pt")
+        torch.save(encoder.state_dict(), f"./models/encoder_{e}.pt")
+        torch.save(decoder.state_dict(), f"./models/decoder_{e}.pt")
 
     plt.plot(range(50), losses, "r-")
     plt.xlabel("# Epochs")
@@ -127,8 +128,7 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     root = "/home/nao/Projects/sasgan"
     data = CAEDataset(
-        os.path.join(root, "data/exported_json_data/scene-1100.json"),
-        os.path.join("data/nuScene-mini"),
+        os.path.join(root, "data/exported_json_data")
     )
     data = DataLoader(data, batch_size=40, shuffle=True, num_workers=2, drop_last=True)
     make_cae(data)
