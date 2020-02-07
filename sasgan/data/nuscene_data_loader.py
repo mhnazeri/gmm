@@ -20,4 +20,4 @@ def load_dataset(_path, version='v1.0-mini', verbose=False):
 
 
 if __name__ == "__main__":
-    load_dataset("nuScene-mini", verbose=True)
+    load_dataset("./nuScene-mini", verbose=True)
