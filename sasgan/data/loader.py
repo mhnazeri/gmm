@@ -21,8 +21,13 @@ def read_file(file: str, feature: str = None):
         # agent_traj = []
         for j in range(len(data) - 1):
             if data[j]["sample_token"] == data[-1][f"agent_{i}"][0]["sample_token"]:
-                appears.append((f"agent_{i}", data[j]["frame_id"],
-                                 (data[j]["frame_id"] + len(data[-1][f"agent_{i}"]))))
+                appears.append(
+                    (
+                        f"agent_{i}",
+                        data[j]["frame_id"],
+                        (data[j]["frame_id"] + len(data[-1][f"agent_{i}"])),
+                    )
+                )
 
     if feature:
         return data, features, appears
@@ -58,7 +63,9 @@ def create_feature_matrix(file):
             agent_data.extend([datum[-1][key][i]["movable"]])
             # print(f"{key}, start: {start}, stop: {stop}")
             # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
-            agents[num, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.double)
+            agents[
+                num, (start * 14) + (i * 14) : (start + 1) * 14 + (i * 14)
+            ] = np.array(agent_data, dtype=np.double)
         num += 1
 
     for id in range(num_frames):
@@ -72,7 +79,9 @@ def create_feature_matrix(file):
 
     else:
         for i in range(40 - num_frames):
-            ego.extend([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+            ego.extend(
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            )
 
     ego = torch.tensor(ego, dtype=torch.double).reshape(-1, 560)
     agents = torch.from_numpy(agents)

@@ -19,11 +19,10 @@ from traj_viz import render_scene_lidar
 import imageio
 
 
-
 logger = logging.getLogger(__name__)
 
 
-def load_dataset(_path, version='v1.0-mini', verbose=False):
+def load_dataset(_path, version="v1.0-mini", verbose=False):
     """Load Nuscene dataset"""
     nusc = NuScenes(version=version, dataroot=_path, verbose=verbose)
     logger.debug(str(nusc.list_scenes), exc_info=1)
@@ -35,8 +34,8 @@ def sample_extractor(nusc, idx_scene):
     sample = nusc.get("sample", nusc.scene[idx_scene]["first_sample_token"])
     _frames = []
     while sample["next"] != "":
-            _frames.append(nusc.get("sample", sample["token"]))
-            sample = nusc.get("sample", sample["next"])
+        _frames.append(nusc.get("sample", sample["token"]))
+        sample = nusc.get("sample", sample["next"])
 
     # Get last frame
     _frames.append(nusc.get("sample", sample["token"]))
@@ -48,19 +47,31 @@ def sample_extractor(nusc, idx_scene):
 def _sample_annotations(nusc, instance):
     sample_annotation = nusc.get("sample_annotation", instance)
     annotation = []
-    movable = 0 if sample_annotation["category_name"].split(".")[-1] in \
-         "barrier debris pushable_pul trafficcone bicycle_rack" else 1
+    movable = (
+        0
+        if sample_annotation["category_name"].split(".")[-1]
+        in "barrier debris pushable_pul trafficcone bicycle_rack"
+        else 1
+    )
     while sample_annotation["next"] != "":
-        annotation.append({"translation": sample_annotation["translation"],
-                        "rotation": sample_annotation["rotation"],
-                        "size": sample_annotation["size"],
-                        "visibility": sample_annotation["visibility_token"],
-                        "category": sample_annotation["category_name"],
-                        "instance_token": sample_annotation["instance_token"],
-                        "sample_token": sample_annotation["sample_token"],
-                        "timestamp": nusc.get("sample", sample_annotation["sample_token"])["timestamp"],
-                        "movable": movable,
-                        "velocity": nusc.box_velocity(sample_annotation["token"]).tolist() if movable  else [0., 0., 0.]})
+        annotation.append(
+            {
+                "translation": sample_annotation["translation"],
+                "rotation": sample_annotation["rotation"],
+                "size": sample_annotation["size"],
+                "visibility": sample_annotation["visibility_token"],
+                "category": sample_annotation["category_name"],
+                "instance_token": sample_annotation["instance_token"],
+                "sample_token": sample_annotation["sample_token"],
+                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                    "timestamp"
+                ],
+                "movable": movable,
+                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                if movable
+                else [0.0, 0.0, 0.0],
+            }
+        )
 
         sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
 
@@ -99,15 +110,23 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     for idx, sample in enumerate(scene_data):
         sample_data = nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
         camera_front = nusc.get("sample_data", sample["data"]["CAM_FRONT"])
-        info = {"frame_id": idx,
-                "token": sample_data["token"],
-                "sample_token": sample_data["sample_token"],
-                "ego_pose_translation": extract("ego_pose", sample_data["ego_pose_token"])["translation"],
-                "ego_pose_rotation": extract("ego_pose", sample_data["ego_pose_token"])["rotation"],
-                "ego_pose_velocity": ego_velocity(nusc, sample["data"]["LIDAR_TOP"]).tolist(),
-                "timestamp": sample_data["timestamp"],
-                "lidar": sample_data["filename"],
-                "camera": camera_front["filename"]}
+        info = {
+            "frame_id": idx,
+            "token": sample_data["token"],
+            "sample_token": sample_data["sample_token"],
+            "ego_pose_translation": extract("ego_pose", sample_data["ego_pose_token"])[
+                "translation"
+            ],
+            "ego_pose_rotation": extract("ego_pose", sample_data["ego_pose_token"])[
+                "rotation"
+            ],
+            "ego_pose_velocity": ego_velocity(
+                nusc, sample["data"]["LIDAR_TOP"]
+            ).tolist(),
+            "timestamp": sample_data["timestamp"],
+            "lidar": sample_data["filename"],
+            "camera": camera_front["filename"],
+        }
 
         info_list.append(info)
 
@@ -125,8 +144,10 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
         return info_list
 
 
-def ego_velocity(nusc, sample_frame_token: str, max_time_diff: float = 1.5) -> np.ndarray:
-        """
+def ego_velocity(
+    nusc, sample_frame_token: str, max_time_diff: float = 1.5
+) -> np.ndarray:
+    """
         Estimate the velocity for ego-vehicle.
         If possible, we compute the centered difference between the previous and next frame.
         Otherwise we use the difference between the current and previous/next frame.
@@ -136,41 +157,41 @@ def ego_velocity(nusc, sample_frame_token: str, max_time_diff: float = 1.5) -> n
         :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
         """
 
-        current = nusc.get('sample_data', sample_frame_token)
-        has_prev = current['prev'] != ''
-        has_next = current['next'] != ''
+    current = nusc.get("sample_data", sample_frame_token)
+    has_prev = current["prev"] != ""
+    has_next = current["next"] != ""
 
-        # Cannot estimate velocity for a single annotation.
-        if not has_prev and not has_next:
-            return np.array([np.nan, np.nan, np.nan])
+    # Cannot estimate velocity for a single annotation.
+    if not has_prev and not has_next:
+        return np.array([np.nan, np.nan, np.nan])
 
-        if has_prev:
-            first = nusc.get('sample_data', current['prev'])
-        else:
-            first = current
+    if has_prev:
+        first = nusc.get("sample_data", current["prev"])
+    else:
+        first = current
 
-        if has_next:
-            last = nusc.get('sample_data', current['next'])
-        else:
-            last = current
+    if has_next:
+        last = nusc.get("sample_data", current["next"])
+    else:
+        last = current
 
-        pos_last = np.array(nusc.get("ego_pose", last["ego_pose_token"])['translation'])
-        pos_first = np.array(nusc.get("ego_pose", first["ego_pose_token"])['translation'])
-        pos_diff = pos_last - pos_first
+    pos_last = np.array(nusc.get("ego_pose", last["ego_pose_token"])["translation"])
+    pos_first = np.array(nusc.get("ego_pose", first["ego_pose_token"])["translation"])
+    pos_diff = pos_last - pos_first
 
-        time_last = 1e-6 * nusc.get("ego_pose", last["ego_pose_token"])['timestamp']
-        time_first = 1e-6 * nusc.get("ego_pose", first["ego_pose_token"])['timestamp']
-        time_diff = time_last - time_first
+    time_last = 1e-6 * nusc.get("ego_pose", last["ego_pose_token"])["timestamp"]
+    time_first = 1e-6 * nusc.get("ego_pose", first["ego_pose_token"])["timestamp"]
+    time_diff = time_last - time_first
 
-        if has_next and has_prev:
-            # If doing centered difference, allow for up to double the max_time_diff.
-            max_time_diff *= 2
+    if has_next and has_prev:
+        # If doing centered difference, allow for up to double the max_time_diff.
+        max_time_diff *= 2
 
-        if time_diff > max_time_diff:
-            # If time_diff is too big, don't return an estimate.
-            return np.array([np.nan, np.nan, np.nan])
-        else:
-            return pos_diff / time_diff
+    if time_diff > max_time_diff:
+        # If time_diff is too big, don't return an estimate.
+        return np.array([np.nan, np.nan, np.nan])
+    else:
+        return pos_diff / time_diff
 
 
 if __name__ == "__main__":
