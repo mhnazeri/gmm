@@ -1,7 +1,6 @@
 """Helper functions for Visualization of trajectories"""
 import os
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation

@@ -1,2 +1,0 @@
-import sasgan
-import data

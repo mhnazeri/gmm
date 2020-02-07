@@ -3,7 +3,7 @@
 Self-Attention Social GAN
 
 TODO list:
-- [ ] Data loader
+- [x] Data loader
 - [ ] Visualization
 - [ ] Network module
 - [ ] Self-attention module

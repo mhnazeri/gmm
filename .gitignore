@@ -1,6 +1,6 @@
-data/nuScene-mini/
-data/argoverse_train/
-data/exported_json_data/
+sasgan/data/nuScene-mini/
+sasgan/data/argoverse_train/
+sasgan/data/exported_json_data/
 *.mp4
 *.json
 *.sublime-project
