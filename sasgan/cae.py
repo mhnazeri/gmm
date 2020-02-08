@@ -126,9 +126,6 @@ def make_cae(
 if __name__ == "__main__":
     torch.manual_seed(42)
     root = "/home/nao/Projects/sasgan"
-    data = CAEDataset(
-        os.path.join(root, "data/exported_json_data/scene-1100.json"),
-        os.path.join("data/nuScene-mini"),
-    )
+    data = CAEDataset(os.path.join(root, "data/exported_json_data"))
     data = DataLoader(data, batch_size=40, shuffle=True, num_workers=2, drop_last=True)
     make_cae(data)
