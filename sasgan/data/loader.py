@@ -128,9 +128,10 @@ class CAEDataset(Dataset):
         return lidar_address, camera_address
 
 
-# data = create_feature_matrix("exported_json_data/scene-1100.json")
-# print(data.shape)
-# data = CAEDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/data/nuScene-mini")
-# print(len(data))
-# print(len(data.lidar_address))
-# print(data[0][14 * 1:14 * 2].reshape(-1, 14).shape)
+if __name__ == '__main__':
+    data = create_feature_matrix("exported_json_data/scene-1100.json")
+    print(data.shape)
+    data = CAEDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/data/nuScene-mini")
+    print(len(data))
+    # print(len(data.lidar_address))
+    print(data[0][14 * 1:14 * 2].reshape(-1, 14).shape)
