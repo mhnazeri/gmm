@@ -41,25 +41,39 @@ class Encoder(nn.Module):
         return out
 
 
+##################################################################################
+#                                Other modules
+# ________________________________________________________________________________
+
+
+
+
+
+
+
+
+
+##################################################################################
+#                              Testing the modules
+# ________________________________________________________________________________
 path_for_json_data = "data/exported_json_data/"
 dataset_dir = "data/nuScene-mini"
 
-# This is the number of the layers which the LSTM cell contains
+# This is the number of the layers which the LSTM cell contains ----> hyper
 num_layers = 10
 
-# This is the feature vector size
+# This is the feature vector size ---> sure
 input_size = 14
 
-# This the whole number of the timestamps on each sample
+# This the whole number of the timestamps on each sample ----> not sure yet
 sequence_length = 80
 
-# The Batch size
+# The Batch size ------> hyper
 Batch_size = 128
 
-# The number of the hidden_layers on each LSTM layer (This parameter acts like the width of the network)
+# The number of the hidden_layers on each LSTM layer (This parameter acts like the width of the network) ------> hyper
 hidden_layers = 40
 
-# used for testing
 if __name__ == '__main__':
     files_list = os.listdir(path_for_json_data)
     for i, file in enumerate(files_list):
