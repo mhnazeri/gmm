@@ -8,33 +8,65 @@ import numpy as np
 import sys
 import os
 from utils import *
+import logging
 
 sys.path.append("data/")
 from loader import CAEDataset
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+logger = logging.getLogger(__name__)
+
+
+##################################################################################
+#                                    Encoder
+# ________________________________________________________________________________
 class Encoder(nn.Module):
-    def __init__(self, num_layers=32):
+    def __init__(self, input_size: int = 14, hidden_size: int = 16, sequence_length: int = 40, num_layers=32, ):
         super(Encoder, self).__init__()
         self.num_layers = 32
-        self.lstm = nn.LSTM()
+        self.hidden_size = hidden_size
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True).to(device)
+
+    def forward(self, input):
+        h_0 = torch.randn((-1, num_layers, self.hidden_size)).to(device)
+        c_0 = torch.randn((-1, num_layers, self.hidden_size)).to(device)
+
+        # Check the integrity of the shapes
+        logger.debug("")
+        logger.debug("The size of the inputs: " + str(input.size()))
+        # input = input.view((-1, ))
+
+        out, _, _ = self.lstm(input, h_0, c_0)
+        # The output is of the shape (batch_size, sequence_length, hidden_size)
+        return out
 
 
-    def forward(x):
-        pass
-
-
-num_layers = 10
 path_for_json_data = "data/exported_json_data/"
 dataset_dir = "data/nuScene-mini"
+
+# This is the number of the layers which the LSTM cell contains
+num_layers = 10
+
+# This is the feature vector size
 input_size = 14
 
+# This the whole number of the timestamps on each sample
+sequence_length = 80
+
+# The Batch size
+Batch_size = 128
+
+# The number of the hidden_layers on each LSTM layer (This parameter acts like the width of the network)
+hidden_layers = 40
 
 # used for testing
 if __name__ == '__main__':
     files_list = os.listdir(path_for_json_data)
     for i, file in enumerate(files_list):
         dataset = CAEDataset(path_for_json_data + file, dataset_dir)
-        print(dataset.shape)
+
+        # In this part the data should be batched
+        print(dataset.scene_frames.numpy().shape)
         print(len(dataset))
         encoder = Encoder()
         encoder()
