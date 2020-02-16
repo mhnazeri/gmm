@@ -114,8 +114,7 @@ def make_cae(
 
         losses.append(loss)
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
-        torch.save(encoder.state_dict(), f"./models/encoder_{e}.pt")
-        torch.save(decoder.state_dict(), f"./models/decoder_{e}.pt")
+        torch.save(encoder.state_dict(), f"./models/model_{e}.pt")
 
     plt.plot(range(50), losses, "r-")
     plt.xlabel("# Epochs")

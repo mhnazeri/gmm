@@ -1,6 +1,7 @@
 sasgan/data/nuScene
 sasgan/data/argoverse_train
 sasgan/data/exported_json_data
+.idea
 *.mp4
 *.json
 *.sublime-project
