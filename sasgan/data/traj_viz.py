@@ -120,8 +120,8 @@ def get_color(category_name: str):
 def render_scene_lidar(root, nusc, idx_scene, save_path=None, blit=False):
     scene_data = sample_extractor(nusc, idx_scene)
     lidar = []
-    for scene in scene_data:
-        lidar.append(scene)
+    for sample_frame in scene_data:
+        lidar.append(sample_frame)
 
     ani = FuncAnimation(fig, update, frames=lidar, init_func=init, blit=blit)
 

@@ -1,4 +1,4 @@
-""" This the file to implement the main model including:
+""" This file contains the implementation of the main models including:
     1. Encoder(Boh)
     2.
 """
@@ -9,6 +9,8 @@ import sys
 import os
 from utils import *
 
+# it is better to delet sys.path.append and use normal import
+# from data.loader import CAEDataset
 sys.path.append("data/")
 from loader import CAEDataset
 
