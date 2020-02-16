@@ -9,10 +9,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from data.loader import CAEDataset
 
-
-sys.path.append("/home/nao/Projects/sasgan/data")
-from loader import CAEDataset
+# sys.path.append("/home/nao/Projects/sasgan/data")
 
 
 class Encoder(nn.Module):

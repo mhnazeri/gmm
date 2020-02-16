@@ -98,7 +98,7 @@ def get_color(category_name: str):
     """
         Provides the default colors based on the category names.
         This method works for the general nuScenes categories, as well as the nuScenes detection categories.
-        """
+    """
     if "bicycle" in category_name or "motorcycle" in category_name:
         return 255, 61, 99  # Red
     elif "vehicle" in category_name or category_name in [
@@ -117,14 +117,14 @@ def get_color(category_name: str):
         return 255, 0, 255  # Magenta
 
 
-def _sample_annotations(nusc, instance):
-    sample_annotation = nusc.get("sample_annotation", instance)
-    annotation = []
-    while sample_annotation["next"] != "":
-        annotation.append(sample_annotation["token"])
-        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+# def _sample_annotations(nusc, instance):
+#     sample_annotation = nusc.get("sample_annotation", instance)
+#     annotation = []
+#     while sample_annotation["next"] != "":
+#         annotation.append(sample_annotation["token"])
+#         sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
 
-    return annotation
+#     return annotation
 
 
 def render_scene_lidar(root, nusc, idx_scene, save_path=None, blit=False):
@@ -137,5 +137,5 @@ def render_scene_lidar(root, nusc, idx_scene, save_path=None, blit=False):
 
     if save_path:
         ani.save(save_path + ".mp4")
-
-    plt.show()
+    # commented for computational reasons
+    # plt.show()
