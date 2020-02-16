@@ -83,11 +83,11 @@ def create_feature_matrix(file):
 
 
 class CAEDataset(Dataset):
-    """
+    """inherited from pytorch dataset builder to facilitate reading, spliting, shuffling data.
 
     """
 
-    def __init__(self, json_file, root_dir, transform=None):
+    def __init__(self, json_file: str, root_dir: str, transform=None):
         self.scene_frames = create_feature_matrix(json_file)
         # self.lidar_address, self.camera_address = self.read_file(json_file)
         self.root_dir = root_dir
@@ -98,9 +98,9 @@ class CAEDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-
-        :param idx:
-        :return:
+        return desired train data with index idx.
+        :param int idx: train data index
+        :return: row idx of train dataset
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
@@ -122,9 +122,10 @@ class CAEDataset(Dataset):
 
     def read_file(self, file: str, feature: str = None):
         """
-
-        :param file:
-        :param feature:
+        read json file of a scene.
+        separate different agent's lidar, camera features
+        :param str file: file name of the scene.
+        :param feature: desired feature. (not using this feature currently)
         :return:
         """
         with open(file, "r") as f:
