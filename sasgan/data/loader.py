@@ -83,7 +83,9 @@ def create_feature_matrix(file):
 
 
 class CAEDataset(Dataset):
-    """Scene frames dataset."""
+    """
+
+    """
 
     def __init__(self, json_file, root_dir, transform=None):
         self.scene_frames = create_feature_matrix(json_file)
@@ -95,6 +97,11 @@ class CAEDataset(Dataset):
         return len(self.scene_frames)
 
     def __getitem__(self, idx):
+        """
+
+        :param idx:
+        :return:
+        """
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
@@ -114,6 +121,12 @@ class CAEDataset(Dataset):
         return sample
 
     def read_file(self, file: str, feature: str = None):
+        """
+
+        :param file:
+        :param feature:
+        :return:
+        """
         with open(file, "r") as f:
             data = json.load(f)
 

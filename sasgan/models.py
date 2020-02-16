@@ -9,7 +9,6 @@ import sys
 import os
 from utils import *
 
-
 sys.path.append("data/")
 from loader import CAEDataset
 
@@ -27,12 +26,15 @@ class Encoder(nn.Module):
 num_layers = 10
 path_for_json_data = "data/exported_json_data/"
 dataset_dir = "data/nuScene-mini"
+input_size = 14
+
 
 # used for testing
 if __name__ == '__main__':
     files_list = os.listdir(path_for_json_data)
     for i, file in enumerate(files_list):
         dataset = CAEDataset(path_for_json_data + file, dataset_dir)
+        print(dataset.shape)
         print(len(dataset))
         encoder = Encoder()
         encoder()
