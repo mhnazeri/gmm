@@ -9,7 +9,7 @@ from nuscenes.utils.data_classes import LidarPointCloud
 
 
 # Defining Global variables
-matplotlib.use( 'tkagg' )
+# matplotlib.use( 'tkagg' )
 fig, axes = plt.subplots(figsize=(18, 9))
 view = np.eye(4)
 ln, = plt.plot([], [], "b.", markersize=1)
@@ -85,7 +85,7 @@ def init():
     return ln,
 
 def get_color(category_name: str):
-        """
+    """
         Provides the default colors based on the category names.
         This method works for the general nuScenes categories, as well as the nuScenes detection categories.
     """
