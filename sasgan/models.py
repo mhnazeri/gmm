@@ -10,13 +10,17 @@ import os
 from utils import *
 import logging
 
-# it is better to delet sys.path.append and use normal import
-# from data.loader import CAEDataset
+# it is better to delet sys.path.append and use normal import (I did, but couldn't, would you mind fixing it)
 sys.path.append("data/")
 from loader import CAEDataset
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# The logger used for debuging and so
 logger = logging.getLogger(__name__)
+
+# tensorboard logger
+tensorboard_logger = Logger()
 
 
 ##################################################################################

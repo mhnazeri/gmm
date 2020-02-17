@@ -5,9 +5,11 @@ import torch
 import logging
 import tensorflow as tf
 import numpy as np
-import scipy.misc
 import time
+from matplotlib import pyplot as plt
 import os
+import io
+from sklearn import datasets
 
 try:
     from StringIO import StringIO  # Python 2.7
@@ -28,8 +30,8 @@ class Logger(object):
         The constructor to build the writer
         :param log_dir: the directory the log files will be saved in.
         """
-        self.writer = tf.summary.create_file_writer(log_dir)
-        self.writer.as_default()
+        self.__writer = tf.summary.create_file_writer(log_dir)
+        self.__writer.set_as_default()
 
     def scalar_summary(self, tag, value, step):
         """
@@ -39,73 +41,81 @@ class Logger(object):
         :param step: The step of logging ----> x axis
         :return: None
         """
+
         tf.summary.scalar(tag, value, step)
-        self.writer.flush()
 
-        # summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-        # self.writer.add_summary(summary, step)
-
-    def image_summary(self, tag, images, step):
+    def image_summary(self, tag, images, step=0, max_outputs = 20):
         """
         Log a list of images
         :param tag: The specified tag
-        :param images: The list of the images
+        :param images: The list of the images of the shape (batch_size, width, height, channels)
         :param step: The step of Logging
+        :param max_outputs: The maximum number of images that will be showed
         :return: None
         """
-        img_summaries = []
-        for i, img in enumerate(images):
-            # Write the image to a string
-            try:
-                s = StringIO()
-            except:
-                s = BytesIO()
-            scipy.misc.toimage(img).save(s, format="png")
 
-            # Create an Image object
-            img_sum = tf.Summary.Image(encoded_image_string=s.getvalue(),
-                                       height=img.shape[0],
-                                       width=img.shape[1])
-            # Create a Summary value
-            img_summaries.append(tf.Summary.Value(tag='%s/%d' % (tag, i), image=img_sum))
+        tf.summary.image(tag, data=images, max_outputs=max_outputs, step=step)
 
-        # Create and write Summary
-        summary = tf.Summary(value=img_summaries)
-        self.writer.add_summary(summary, step)
-
-    def histo_summary(self, tag, values, step, bins=1000):
+    @staticmethod
+    def plot_to_image(figure):
         """
-        Log a histogram of tensor values
+        Function used for converting a figure to an image to be shown in tensorboard
+        :param figure: The source figure
+        :return: Image format of the figure
+        """
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close(figure)
+        buf.seek(0)
+        image = tf.image.decode_png(buf.getvalue(), channels=4)
+        image = tf.expand_dims(image, 0)
+        return image
+
+    def figure_summary(self, tag, figure, step=0):
+        """
+        Used for plotting a figure of any type in the tensorboard dashboard
         :param tag: The specified tag
-        :param values: The values of the metric which will be used for histograming
+        :param figure: The source figure
         :param step: The step of visualizing
-        :param bins: Number of the total bins
         :return: None
         """
-        # Create a histogram using numpy
-        counts, bin_edges = np.histogram(values, bins=bins)
+        image = Logger.plot_to_image(figure)
+        self.image_summary(tag, image, step, max_outputs=1)
 
-        # Fill the fields of the histogram proto
-        hist = tf.HistogramProto()
-        hist.min = float(np.min(values))
-        hist.max = float(np.max(values))
-        hist.num = int(np.prod(values.shape))
-        hist.sum = float(np.sum(values))
-        hist.sum_squares = float(np.sum(values ** 2))
-
-        # Drop the start of the first bin
-        bin_edges = bin_edges[1:]
-
-        # Add bin edges and counts
-        for edge in bin_edges:
-            hist.bucket_limit.append(edge)
-        for c in counts:
-            hist.bucket.append(c)
-
-        # Create and write Summary
-        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
-        self.writer.add_summary(summary, step)
-        self.writer.flush()
+    # Still have to work on
+    # def histo_summary(self, tag, values, step, bins=1000):
+    #     """
+    #     Log a histogram of tensor values
+    #     :param tag: The specified tag
+    #     :param values: The values of the metric which will be used for histograming
+    #     :param step: The step of visualizing
+    #     :param bins: Number of the total bins
+    #     :return: None
+    #     """
+    #     # Create a histogram using numpy
+    #     counts, bin_edges = np.histogram(values, bins=bins)
+    #
+    #     # Fill the fields of the histogram proto
+    #     hist = tf.HistogramProto()
+    #     hist.min = float(np.min(values))
+    #     hist.max = float(np.max(values))
+    #     hist.num = int(np.prod(values.shape))
+    #     hist.sum = float(np.sum(values))
+    #     hist.sum_squares = float(np.sum(values ** 2))
+    #
+    #     # Drop the start of the first bin
+    #     bin_edges = bin_edges[1:]
+    #
+    #     # Add bin edges and counts
+    #     for edge in bin_edges:
+    #         hist.bucket_limit.append(edge)
+    #     for c in counts:
+    #         hist.bucket.append(c)
+    #
+    #     # Create and write Summary
+    #     summary = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
+    #     self.__writer.add_summary(summary, step)
+    #     self.__writer.flush()
 
 
 def get_the_number_of_GPUs():
@@ -153,9 +163,35 @@ def load_model(path):
 
 
 if __name__ == '__main__':
+
+    # Testing the scalar_summary
     num_steps = 40
     tensorflow_logger = Logger()
     for step in range(num_steps):
         torch_scalar = np.random.random()
         tensorflow_logger.scalar_summary("Some random value", torch_scalar, step)
 
+    # Testing the image_summary with one input
+    mnist = datasets.load_digits()
+    train = mnist["data"]
+    print(train.shape)
+    tensorflow_logger.image_summary("MNIST dataset", train[0].reshape((-1, 8, 8, 1)))
+
+    # Testing the image_summary with many input images
+    tensorflow_logger.image_summary("MNIST dataset many", train[0:10].reshape(-1, 8, 8, 1))
+
+    # Testing the figure_summary with a figure
+    figure = plt.figure()
+    plt.subplot(2, 2, 1)
+    plt.imshow(train[0].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("1")
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(train[1].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("2")
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(train[2].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("3")
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(train[3].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("4")
+
+    tensorflow_logger.figure_summary("Testing the figure", figure)
