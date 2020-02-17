@@ -66,7 +66,7 @@ def create_feature_matrix_for_cae(file):
     datum = torch.cat((ego, agents), 0)
     # datum = torch.transpose(datum, 1, 0)
 
-    return datum.view(-1, 14)
+    return datum
 
 
 def create_feature_matrix_for_train(file):
@@ -98,7 +98,7 @@ def create_feature_matrix_for_train(file):
     agents = torch.from_numpy(agents)
     datum = torch.cat((ego, agents), 0)
 
-    return datum.view(-1, 7)
+    return datum
 
 
 if __name__ == "__main__":
