@@ -9,12 +9,6 @@ import time
 from matplotlib import pyplot as plt
 import os
 import io
-from sklearn import datasets
-
-try:
-    from StringIO import StringIO  # Python 2.7
-except ImportError:
-    from io import BytesIO         # Python 3.x
 
 logger = logging.getLogger(__name__)
 
