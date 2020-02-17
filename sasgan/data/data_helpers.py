@@ -27,7 +27,7 @@ def read_file(file: str, feature: str = None):
     return data, appears
 
 
-def create_feature_matrix(file):
+def create_feature_matrix_for_cae(file):
     datum, timestamps, appears = read_file(file, "timestamp")
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
@@ -69,5 +69,38 @@ def create_feature_matrix(file):
     return datum.view(-1, 14)
 
 
+def create_feature_matrix_for_train(file):
+    datum, timestamps, appears = read_file(file, "timestamp")
+    num_frames = len(timestamps) if len(timestamps) < 40 else 40
+    ego = []
+    agents = np.zeros((len(datum[-1]), 280), dtype=np.double)
+    # appears = (agent_num, start, stop)
+    # sort by their number of visibilities in frames
+    appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
+    num = 0
+    for key, start, stop in appears:
+        for i in range(stop - start):
+            agent_data = datum[-1][key][i]["translation"]
+            agent_data.extend(datum[-1][key][i]["rotation"])
+            agents[num, (start * 7) + (i * 7): (start + 1) * 7 + (i * 7)] = np.array(agent_data, dtype=np.double)
+        num += 1
+
+    for id in range(num_frames):
+        # ego vehicle location
+        ego.extend(datum[id]["ego_pose_translation"])
+        # ego vehicle rotation
+        ego.extend(datum[id]["ego_pose_rotation"])
+    else:
+        for i in range(40 - num_frames):
+            ego.extend([0., 0., 0., 0., 0., 0., 0.])
+
+    ego = torch.tensor(ego, dtype=torch.double).reshape(-1, 280)
+    agents = torch.from_numpy(agents)
+    datum = torch.cat((ego, agents), 0)
+
+    return datum.view(-1, 7)
+
+
 if __name__ == "__main__":
-    pass
+    data = create_feature_matrix_for_train("exported_json_data/scene-0061.json")
+    print(data.shape)

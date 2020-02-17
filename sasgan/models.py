@@ -9,11 +9,8 @@ import sys
 import os
 from utils import *
 import logging
+from data.loader import CAEDataset
 
-# it is better to delet sys.path.append and use normal import
-# from data.loader import CAEDataset
-sys.path.append("data/")
-from loader import CAEDataset
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logger = logging.getLogger(__name__)
