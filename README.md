@@ -13,3 +13,12 @@ TODO list:
 - [ ] ADE and FDE
 - [ ] Train loop
 - [ ] Test loop
+
+
+## Tutorial on how to use the logger class: 
+I have to recall that this class works with tensorboard and is independant of the python logger package.
+
+### list of the functions
+
+1. 
+ 

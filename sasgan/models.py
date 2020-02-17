@@ -16,7 +16,12 @@ sys.path.append("data/")
 from loader import CAEDataset
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# The logger used for debuging and so
 logger = logging.getLogger(__name__)
+
+# tensorboard logger
+tensorboard_logger = Logger()
 
 
 ##################################################################################
