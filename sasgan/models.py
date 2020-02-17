@@ -20,6 +20,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logger = logging.getLogger(__name__)
 
 # tensorboard logger
+global tensorboard_logger
 tensorboard_logger = Logger()
 
 

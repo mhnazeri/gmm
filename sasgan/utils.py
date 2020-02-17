@@ -163,35 +163,4 @@ def load_model(path):
 
 
 if __name__ == '__main__':
-
-    # Testing the scalar_summary
-    num_steps = 40
-    tensorflow_logger = Logger()
-    for step in range(num_steps):
-        torch_scalar = np.random.random()
-        tensorflow_logger.scalar_summary("Some random value", torch_scalar, step)
-
-    # Testing the image_summary with one input
-    mnist = datasets.load_digits()
-    train = mnist["data"]
-    print(train.shape)
-    tensorflow_logger.image_summary("MNIST dataset", train[0].reshape((-1, 8, 8, 1)))
-
-    # Testing the image_summary with many input images
-    tensorflow_logger.image_summary("MNIST dataset many", train[0:10].reshape(-1, 8, 8, 1))
-
-    # Testing the figure_summary with a figure
-    figure = plt.figure()
-    plt.subplot(2, 2, 1)
-    plt.imshow(train[0].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("1")
-
-    plt.subplot(2, 2, 2)
-    plt.imshow(train[1].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("2")
-
-    plt.subplot(2, 2, 3)
-    plt.imshow(train[2].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("3")
-
-    plt.subplot(2, 2, 4)
-    plt.imshow(train[3].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]), plt.title("4")
-
-    tensorflow_logger.figure_summary("Testing the figure", figure)
+    pass
