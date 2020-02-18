@@ -5,16 +5,7 @@ SAS-GAN is an attempt to tackle the challenge of understanding the human driving
 The aim of this post is to gather all information about sasgan in one place.
 The sasgan architecture consists of two separate networks, the first one is responsible for transforming all the features in to a unified latent feature space. Exerting the first network, the second network is responsible to generate plausible trajectories.
 
-TODO list:
-- [x] Data loader
-- [ ] Visualization
-- [ ] Network module
-- [ ] Self-attention module
-- [ ] ADE and FDE
-- [ ] Train loop
-- [ ] Test loop
 
-# Model
 <div align="center">
     <img align="center" src="images/Model.png" alt="" width=600px>
     <figcaption>Figure 1: Overview of SAS-GAN architecture. It consists of three parts: feature extractor,
@@ -68,4 +59,14 @@ plt.imshow(train[3].reshape((8, 8)), cmap="gray"), plt.xticks([]), plt.yticks([]
 
 tensorflow_logger.figure_summary("Testing the figure", figure)
 ```
+
+
+TODO list:
+- [x] Data loader
+- [ ] Visualization
+- [ ] Network module
+- [ ] Self-attention module
+- [ ] ADE and FDE
+- [ ] Train loop
+- [ ] Test loop
 
