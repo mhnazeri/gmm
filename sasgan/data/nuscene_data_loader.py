@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
-from traj_viz import render_scene_lidar
+from sasgan.data.traj_viz import render_scene_lidar
 import imageio
 
 
