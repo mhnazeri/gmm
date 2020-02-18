@@ -14,6 +14,11 @@ TODO list:
 - [ ] Train loop
 - [ ] Test loop
 
+# Model
+
+
+
+
 
 ## Tutorial on how to use the logger class: 
 I have to recall that this class works with tensorboard and is independant of the python logger package.

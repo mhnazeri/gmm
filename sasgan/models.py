@@ -26,22 +26,33 @@ tensorboard_logger = Logger()
 #                                    Encoder
 # ________________________________________________________________________________
 class Encoder(nn.Module):
-    def __init__(self, input_size: int = 14, hidden_size: int = 16, sequence_length: int = 40, num_layers=32, ):
+    def __init__(self, input_size: int = 14, embedding_dimension: int = 64, hidden_size: int = 16, num_layers=32, ):
         super(Encoder, self).__init__()
         self.num_layers = 32
         self.hidden_size = hidden_size
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True).to(device)
+        self.embedder = nn.Linear(input_size, embedding_dimension).to(device)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers).to(device)
+
+    def initiate_hidden(self, batch_size):
+        return (
+            torch.zeros(self.num_layers, batch_size, self.hidden_size),
+            torch.zeros(self.num_layers, batch_size, self.hidden_size)
+        )
 
     def forward(self, input):
-        h_0 = torch.randn((-1, num_layers, self.hidden_size)).to(device)
-        c_0 = torch.randn((-1, num_layers, self.hidden_size)).to(device)
+        """
+        :param input: A tensor of the shape (sequence_length, batch, input_size)
+        :return: A tensor of the shape (seqeunce_length, batch, hidden_size)
+        """
 
         # Check the integrity of the shapes
-        logger.debug("")
         logger.debug("The size of the inputs: " + str(input.size()))
-        # input = input.view((-1, ))
 
-        out, _, _ = self.lstm(input, h_0, c_0)
+        batch_size = input.size(1)
+        embed = self.embedder(input)
+        states = self.initiate_hidden(batch_size)
+        out, _, _ = self.lstm(embed, states)
+
         # The output is of the shape (batch_size, sequence_length, hidden_size)
         return out
 
