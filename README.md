@@ -16,7 +16,7 @@ TODO list:
 
 # Model
 <div align="center">
-    <img align="center" src="images/Model.png" alt="" width=200px>
+    <img align="center" src="images/Model.png" alt="" width=600px>
     <figcaption>Figure 1: Overview of SAS-GAN architecture. It consists of three parts: feature extractor,
 social pooling, and generato </figcaption>
 </div>
