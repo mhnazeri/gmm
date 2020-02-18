@@ -4,9 +4,7 @@ from imageio import imread
 import torch
 from torch.utils.data import Dataset
 from nuscenes.utils.data_classes import LidarPointCloud
-from data_helpers import create_feature_matrix_for_cae
-
-
+from sasgan.data.data_helpers import create_feature_matrix_for_cae
 
 class CAEDataset(Dataset):
     """inherited from pytorch dataset builder to facilitate reading, spliting, shuffling data.
@@ -69,6 +67,7 @@ class CAEDataset(Dataset):
 
 
 if __name__ == '__main__':
+    print(os.listdir("."))
     data = create_feature_matrix_for_cae("exported_json_data/scene-1100.json")
     print(data.shape)
     data = CAEDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/data/nuScene-mini")

@@ -7,14 +7,14 @@ import torch.nn as nn
 import numpy as np
 import sys
 import os
-from utils import *
+from sasgan.utils import *
 import logging
-from data.loader import CAEDataset
+from sasgan.data.loader import CAEDataset
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# The logger used for debuging and so
+# The logger used for debugging
 logger = logging.getLogger(__name__)
 
 # tensorboard logger
