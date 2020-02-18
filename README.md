@@ -15,9 +15,11 @@ TODO list:
 - [ ] Test loop
 
 # Model
-
-
-
+<div align="center">
+    <img align="center" src="images/Model.png" alt="" width=200px>
+    <figcaption>Figure 1: Overview of SAS-GAN architecture. It consists of three parts: feature extractor,
+social pooling, and generato </figcaption>
+</div>
 
 
 ## Tutorial on how to use the logger class: 
