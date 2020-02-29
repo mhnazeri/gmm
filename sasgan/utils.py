@@ -1,14 +1,18 @@
 """
 This is the main file for utility functions
 """
+import os
+import time
+import io
+import configparser
+import attrdict
+from typing import Dict
 import torch
 import logging
 import tensorflow as tf
 import numpy as np
-import time
 from matplotlib import pyplot as plt
-import os
-import io
+
 
 logger = logging.getLogger(__name__)
 
@@ -156,5 +160,19 @@ def load_model(path):
     return torch.load(path + checkpoints_lists[index])
 
 
+def config(modeule_name: str=None) -> Dict[str, str]:
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+    try:
+        # using attrdict
+        # return attrdict.AttrDict(config[modeule_name])
+        return config[modeule_name]
+    except KeyError as err:
+        print(f"Module name should be one of the:\n "
+              f"{config.sections()} not {err}")
+
+
 if __name__ == '__main__':
-    pass
+    cae_config = config("CAE")
+    # print(cae_config["latent_dim"])
+    # print(cae_config.latent_dim)
