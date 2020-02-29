@@ -10,19 +10,18 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from data.loader import CAEDataset
-
-# sys.path.append("/home/nao/Projects/sasgan/data")
+from utils import config
 
 
 class Encoder(nn.Module):
     """Encoder network of CAE"""
 
-    def __init__(self, n_inputs=14, n_hidden=1, activation="sigmoid"):
+    def __init__(self, n_inputs=14, n_hidden=28, n_latent=1, activation="sigmoid"):
         super(Encoder, self).__init__()
         self.n_inputs = n_inputs
-        self.n_hidden = n_hidden
-        self.fc_1 = nn.Linear(self.n_inputs, 28)
-        self.fc_2 = nn.Linear(28, n_hidden)
+        self.n_latent = n_latent
+        self.fc_1 = nn.Linear(self.n_inputs, n_hidden)
+        self.fc_2 = nn.Linear(n_hidden, n_latent)
 
         if activation == "sigmoid":
             self.activation = nn.Sigmoid()
@@ -39,14 +38,14 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """Decoder network of CAE"""
 
-    def __init__(self, n_inputs=1, n_output=14, activation="sigmoid"):
+    def __init__(self, n_inputs=14, n_hidden=28, n_latent=1, activation="sigmoid"):
         super(Decoder, self).__init__()
+        self.n_latent = n_latent
         self.n_inputs = n_inputs
-        self.n_output = n_output
 
         # encoder network, two layer mlp
-        self.fc_1 = nn.Linear(n_inputs, 28)
-        self.fc_2 = nn.Linear(28, n_output)
+        self.fc_1 = nn.Linear(n_latent, n_hidden)
+        self.fc_2 = nn.Linear(n_hidden, n_inputs)
 
         if activation == "sigmoid":
             self.activation = nn.Sigmoid()
@@ -81,15 +80,15 @@ def loss_function(output_encoder, outputs, inputs, lamda=1e-4):
 def make_cae(
     dataloader_train,
     n_inputs=14,
-    n_output=14,
-    n_hidden=1,
+    n_latent=1,
+    n_hidden=28,
     batch=40,
     epochs=50,
     activation="sigmoid",
 ):
     """create the whole cae"""
-    encoder = Encoder(n_inputs, n_hidden, activation).double()
-    decoder = Decoder(n_hidden, n_output, activation).double()
+    encoder = Encoder(n_inputs, n_hidden, n_latent, activation).double()
+    decoder = Decoder(n_inputs, n_hidden, n_latent, activation).double()
 
     optimizer = optim.Adam(
         [{"params": encoder.parameters()}, {"params": decoder.parameters()}], lr=0.005
@@ -123,8 +122,14 @@ def make_cae(
 
 
 if __name__ == "__main__":
+    cae_config = config("CAE")
+    paths = config("Paths")
     torch.manual_seed(42)
-    root = "/home/nao/Projects/sasgan"
-    data = CAEDataset(os.path.join(root, "data/exported_json_data"))
-    data = DataLoader(data, batch_size=40, shuffle=True, num_workers=2, drop_last=True)
-    make_cae(data)
+    # root = "/home/nao/Projects/sasgan"
+    root = paths["root"]
+    data = CAEDataset(os.path.join(root, paths["nuscenes_json"])
+    data = DataLoader(data, batch_size=cae_config["batch_size"], shuffle=True, num_workers=2, drop_last=True)
+
+    make_cae(data, cae_config["input_dim"], cae_config["latent_dim"],
+             cae_config["hidden_dim"], cae_config["batch_size"],
+             cae_config["epochs"], cae_config["activation"])

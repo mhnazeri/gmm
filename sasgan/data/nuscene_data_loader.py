@@ -6,7 +6,7 @@ TODO:
 """
 import os
 import logging
-import json
+import orjson as json
 import numpy as np
 from functools import lru_cache
 from mpl_toolkits.mplot3d import Axes3D
