@@ -134,11 +134,11 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     if path:
         if os.path.exists(path):
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list))
+                f.write(json.dumps(info_list, indent=4))
         else:
             os.mkdir(path)
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list))
+                f.write(json.dumps(info_list, indent=4))
 
     else:
         return info_list
@@ -194,17 +194,52 @@ def ego_velocity(
         return pos_diff / time_diff
 
 
+def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
+    im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
+    im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
+
+    im = im / 255
+    im_2 = im_2 / 255
+    fig = plt.figure()
+    a = fig.add_subplot(3, 1, 1)
+    plt.imshow(im)
+    # print("image 1: ", im.shape)
+    # print("image 2: ", im_2.shape)
+    fig.add_subplot(3, 1, 2)
+    a.set_title("Frame 2")
+    plt.imshow(im_2)
+    a = fig.add_subplot(3, 1, 3)
+    a.set_title("Motion")
+    plt.imshow(im_2 - im, cmap="hot")
+    plt.show()
+
+
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
+    backgraound_motion_detector(root)
     # render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
-    for idx in range(len(nusc.scene)):
-        extract_scene_data_as_json(nusc, idx, "exported_json_data")
+    # for idx in range(len(nusc.scene)):
+    #     extract_scene_data_as_json(nusc, idx, "exported_json_data")
+
+    # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")
+    # sample_ann = nusc.get("sample_annotation", sample["anns"][0])
+    # # print(sample_ann)
+    # sample_data = nusc.get("sample", sample_ann["sample_token"])
+    # lidar = nusc.get("sample_data", sample_data["data"]["LIDAR_TOP"])
+    # print(nusc.get("ego_pose", lidar["ego_pose_token"]))
+
+    # print(nusc.get("calibrated_sensor", lidar["calibrated_sensor_token"]))
+    # print(nusc.get("calibrated_sensor", sample_data["calibrated_sensor_token"]))
+
     # im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
     # im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
 
-    # # plt.imshow(im)
-    # print("image 1: ", im.shape)
-    # print("image 2: ", im_2.shape)
+    # fig = plt.figure()
+    # a = fig.add_subplot(2, 1, 1)
+    # plt.imshow(im)
+    # # print("image 1: ", im.shape)
+    # # print("image 2: ", im_2.shape)
+    # a = fig.add_subplot(2, 1, 2)
     # plt.imshow(im_2)
     # plt.show()
