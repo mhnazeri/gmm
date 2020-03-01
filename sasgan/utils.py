@@ -174,5 +174,5 @@ def config(modeule_name: str=None) -> Dict[str, str]:
 
 if __name__ == '__main__':
     cae_config = config("CAE")
-    # print(cae_config["latent_dim"])
+    print(cae_config["latent_dim"])
     # print(cae_config.latent_dim)

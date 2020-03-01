@@ -1,6 +1,6 @@
 """ This file contains the implementation of the main models including:
     1. Encoder(Boh)
-    2.
+    2. Contextual Feature Extractor
 """
 import torch
 import torch.nn as nn
@@ -64,6 +64,60 @@ class Encoder(nn.Module):
 
         return hidden_state
 
+
+##################################################################################
+#                        Convolution Feature Extractor
+# ________________________________________________________________________________
+class Contextual_Features(nn.Module):
+    """Extract contextual features from the environment
+        Networks that can be used for feature extraction are:
+            overfeat: returned matrix is 1024*12*12
+    """
+    def __init__(self, model_arch: str="overfeat"):
+        if model_arch == "overfeat":
+            self.layer_1 = nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
+                                     out_channels=96)
+            self.layer_1_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.layer_2 = nn.Conv2d(in_channels=96, out_channels=256,
+                                     kernel_size=5, stride=1)
+            self.layer_2_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.layer_3 = nn.Conv2d(in_channels=256, out_channels=512,
+                                     kernel_size=3, stride=1, padding=1)
+            self.layer_4 = nn.Conv2d(in_channels=512, out_channels=1024,
+                                     kernel_size=3, stride=1, padding=1)
+            self.layer_5 = nn.Conv2d(in_channels=1024, out_channels=1024,
+                                     kernel_size=3, stride=1, padding=1)
+            # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+            #self-attention method proposed in self-attention gan Zhang et al.
+            self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                                 kernel_size=3, stride=1, padding=1)
+            self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                                 kernel_size=3, stride=1, padding=1)
+            self.frame_hx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                                 kernel_size=3, stride=1, padding=1)
+            self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                                 kernel_size=3, stride=1, padding=1)
+
+
+    def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
+        frame = self.background_motion(frame_1, frame_2)
+        frame = self.layer_1_pooling(self.layer_1(frame))
+        frame = self.layer_2_pooling(self.layer_2(frame))
+        frame = self.layer_3(frame)
+        frame = self.layer_4(frame)
+        frame = self.layer_5(frame)
+        if frame.shape != (1024, 12, 12):
+            frame = frame.view(1024, 12, 12)
+        frame_fx = self.frame_fx(frame)
+        frame_gx = self.frame_gx(frame)
+        frame_hx = self.frame_hx(frame)
+        frame = nn.Softmax2d(frame_fx.transpose_(2, 1).matmul(frame_gx), dim=1)
+        frame = frame_hx.matmul(frame)
+        return self.frame_vx(frame).view(1024, 12, 12)
+
+    def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
+        """returns background motion between two consequtive frames"""
+        return frame_2 - frame_1
 
 ##################################################################################
 #                                Other modules
