@@ -137,11 +137,8 @@ class Fusion(nn.Module):
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.pool_dim = pool_dim
-        mlp = (
-            nn.Linear(56, pool_dim),
-            nn.MaxPool(kernel_size=2, stride=2)
-        )
-        self.linear = nn.Linear(*mlp)
+        self.linear = nn.Linear(nn.Linear(56, pool_dim),
+                                nn.MaxPool(kernel_size=2, stride=2))
         self.fuse = nn.LSTM(input_size=147619, hidden_size=256)
 
     def initiate_hidden(self):
@@ -149,6 +146,16 @@ class Fusion(nn.Module):
             torch.zeros(1, self.batch_size, self.hidden_size),
             torch.zeros(1, self.batch_size, self.hidden_size)
         )
+
+    def get_noise(self, shape, noise_type="gaussian"):
+        if noise_type == 'gaussian':
+            return torch.randn(*shape).cuda()
+        elif noise_type == 'uniform':
+            return torch.rand(*shape).sub_(0.5).mul_(2.0).cuda()
+        raise ValueError('Unrecognized noise type "%s"' % noise_type)
+
+    def rel_distance(agent_1, agent_2):
+        return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
     def forward(self, real_history, pool, context_feature, i):
         """receives the whole feature matrix as input (max_agents * 56)
@@ -174,14 +181,11 @@ class Fusion(nn.Module):
 
         _, fused_features_hidden, _ = self.fuse(cat_features,
                                                 self.initiate_hidden())
-        # dim: 6 + 256 = 262
+        # dim: 2 + 6 + 256 = 264
         fused_features_hidden = torch.cat(
-            (real_history[i], fused_features_hidden),
+            (self.get_noise((2,)), real_history[i], fused_features_hidden),
             1)
         return fused_features_hidden
-
-    def rel_distance(agent_1, agent_2):
-        return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
 ##################################################################################
 #                              Testing the modules
