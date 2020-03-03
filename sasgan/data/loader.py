@@ -7,13 +7,14 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from nuscenes.utils.data_classes import LidarPointCloud
 from data_helpers import create_feature_matrix_for_cae
+from utils import config
 
 
 class NuSceneDataset(Dataset):
     """nuScenes dataset includes lidar data, camera images, positions, physical features
     """
 
-    def __init__(self, json_file: str, root_dir: str, transform=None):
+    def __init__(self,  root_dir: str, json_file: str, transform=None):
         self.lidar_address, self.camera_address = self.read_file(json_file)
         self.root_dir = root_dir
         self.transform = transform
@@ -29,7 +30,7 @@ class NuSceneDataset(Dataset):
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
- 
+
         sample = Image.open(osp.join(self.root_dir, self.camera_address[idx]))
 
         # img_name = os.path.join(self.root_dir,
@@ -42,7 +43,7 @@ class NuSceneDataset(Dataset):
         # sample = {'frames': self.scene_frames, 'image': image, 'lidar': lidar}
 
         if self.transform:
-            sample = self.transform(sample)
+            sample = self.transform(sample).squeeze()
 
         return sample
 
@@ -75,9 +76,13 @@ class CAEDataset(Dataset):
 
     def __init__(self, json_file: str, root_dir: str, transform=None):
         self.scene_frames = create_feature_matrix_for_cae(json_file)
-        # self.lidar_address, self.camera_address = self.read_file(json_file)
         self.root_dir = root_dir
         self.transform = transform
+        dummy = torch.zeros(100 - len(self.scene_frames), 560)
+        self.scene_frames = torch.cat((self.scene_frames, dummy), 0)
+        # if you want read the list 5 element at a time
+        t = list(zip(l[::28], l[28::28]))
+        self.start_stop = [l[x[0]:x[1]] for x in t]
 
     def __len__(self):
         return len(self.scene_frames)
@@ -90,7 +95,9 @@ class CAEDataset(Dataset):
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
-
+        start, stop = self.start_stop[idx]
+        # all agents (rows), specific columns (timestamps)
+        # sample = self.scene_frames[:, start: stop]
         sample = self.scene_frames[idx]
         # img_name = os.path.join(self.root_dir,
         #                         self.camera_address[idx])
@@ -103,7 +110,6 @@ class CAEDataset(Dataset):
 
         if self.transform:
             sample = self.transform(sample)
-            sample = sample.transpose(2, 0, 1)
 
         return sample
 
@@ -130,15 +136,17 @@ class CAEDataset(Dataset):
 
 
 if __name__ == '__main__':
+    paths = config("Paths")
     data = create_feature_matrix_for_cae("exported_json_data/scene-1100.json")
     print(data.shape)
     transforms = transforms.Compose([
-        transforms.Grayscale(),
         transforms.Resize((256, 256)),
+        transforms.Grayscale(),
         transforms.ToTensor(),
     ])
-    data = NuSceneDataset("exported_json_data/scene-1100.json", "/home/nao/Projects/sasgan/sasgan/data/nuScene-mini",
+    data = NuSceneDataset("/home/nao/Projects/sasgan/sasgan/data/nuScene-mini", "exported_json_data/scene-1100.json",
                          transform=transforms)
     print(len(data))
     print(data[0].shape)
+    # print(type(data[0]))
     # print(data[0][14 * 1:14 * 2].reshape(-1, 14).shape)

@@ -46,17 +46,17 @@ class Encoder(nn.Module):
             torch.zeros(self.num_layers, batch_size, self.hidden_size)
         )
 
-    def forward(self, input):
+    def forward(self, inputs):
         """
-        :param input: A tensor of the shape (sequence_length, batch, input_size)
+        :param inputs: A tensor of the shape (sequence_length, batch, input_size)
         :return: A tensor of the shape (self.num_layers, batch, self.hidden_size)
         """
 
         # Check the integrity of the shapes
-        logger.debug("The size of the inputs: " + str(input.size()))
+        logger.debug("The size of the inputs: " + str(inputs.size()))
 
-        batch_size = input.size(1)
-        embed = self.embedder(input.view(-1, 2))
+        batch_size = inputs.size(1)
+        embed = self.embedder(inputs.view(-1, 2))
         embed = embed.view(-1, batch_size, self.embedding_dimension)
 
         states = self.initiate_hidden(batch_size)
@@ -66,7 +66,7 @@ class Encoder(nn.Module):
 
 
 ##################################################################################
-#                        Convolution Feature Extractor
+#                        Contextual Feature Extractor
 # ________________________________________________________________________________
 class Contextual_Features(nn.Module):
     """Extract contextual features from the environment
@@ -74,13 +74,21 @@ class Contextual_Features(nn.Module):
             overfeat: returned matrix is 1024*12*12
     """
     def __init__(self, model_arch: str="overfeat"):
+        super(Contextual_Features, self).__init__()
         if model_arch == "overfeat":
-            self.layer_1 = nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
-                                     out_channels=96)
-            self.layer_1_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
-            self.layer_2 = nn.Conv2d(in_channels=96, out_channels=256,
-                                     kernel_size=5, stride=1)
-            self.layer_2_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.layer_1 = nn.Sequential(
+                nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
+                                     out_channels=96),
+                nn.MaxPool2d(kernel_size=2, stride=2)
+                )
+            # self.layer_1 = nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
+            #                          out_channels=96)
+            # self.layer_1_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.layer_2 = nn.Sequential(
+                nn.Conv2d(in_channels=96, out_channels=256,
+                                     kernel_size=5, stride=1),
+                nn.MaxPool2d(kernel_size=2, stride=2)
+                )
             self.layer_3 = nn.Conv2d(in_channels=256, out_channels=512,
                                      kernel_size=3, stride=1, padding=1)
             self.layer_4 = nn.Conv2d(in_channels=512, out_channels=1024,
@@ -101,8 +109,8 @@ class Contextual_Features(nn.Module):
 
     def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
         frame = self.background_motion(frame_1, frame_2)
-        frame = self.layer_1_pooling(self.layer_1(frame))
-        frame = self.layer_2_pooling(self.layer_2(frame))
+        frame = self.layer_1(frame)
+        frame = self.layer_2(frame)
         frame = self.layer_3(frame)
         frame = self.layer_4(frame)
         frame = self.layer_5(frame)
@@ -120,16 +128,60 @@ class Contextual_Features(nn.Module):
         return frame_2 - frame_1
 
 ##################################################################################
-#                                Other modules
+#                               Fusion modules
 # ________________________________________________________________________________
+class Fusion(nn.Module):
+    """Feature Pool and Fusion module"""
+    def __init__(self, pool_dim=64, hidden_size=128, batch_size=1):
+        super(Fusion, self).__init__()
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
+        self.pool_dim = pool_dim
+        mlp = (
+            nn.Linear(56, pool_dim),
+            nn.MaxPool(kernel_size=2, stride=2)
+        )
+        self.linear = nn.Linear(*mlp)
+        self.fuse = nn.LSTM(input_size=147619, hidden_size=256)
 
+    def initiate_hidden(self):
+        return (
+            torch.zeros(1, self.batch_size, self.hidden_size),
+            torch.zeros(1, self.batch_size, self.hidden_size)
+        )
 
+    def forward(self, real_history, pool, context_feature, i):
+        """receives the whole feature matrix as input (max_agents * 56)
+        28 is for 2 seconds input (each second is 2 frame, each frame has 14
+        features)
+        args:
+            real_history: a matrix containing unmodified past locations
+            pool: modified past locations
+            context_feature: tensor of size=(1024, 12, 12)=147456
+            i: desired agent number to forecast future
+        """
+        agent = pool[i] # a vector of size 56
+        distances = []
+        for j in range(len(pool)):
+            if j != i:
+                distances.append(rel_distance(agent, pool[j]))
 
+        agent = self.linear(agent)
+        agent = torch.cat((distances, agent), 1) # vector of 99 + 64 = 163
+        context_feature = context_feature.view(-1) # 147456 digits
+        cat_features = torch.cat((context_feature, agent), 0) # 147619
+        cat_features = cat_features.view(-1, self.batch_size, self.pool_dim)
 
+        _, fused_features_hidden, _ = self.fuse(cat_features,
+                                                self.initiate_hidden())
+        # dim: 6 + 256 = 262
+        fused_features_hidden = torch.cat(
+            (real_history[i], fused_features_hidden),
+            1)
+        return fused_features_hidden
 
-
-
-
+    def rel_distance(agent_1, agent_2):
+        return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
 ##################################################################################
 #                              Testing the modules
