@@ -7,9 +7,9 @@ import torch.nn as nn
 import numpy as np
 import sys
 import os
-from sasgan.utils import *
+from utils import *
 import logging
-from sasgan.data.loader import CAEDataset
+from data.loader import CAEDataset
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -36,9 +36,9 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.num_layers = 32
         self.hidden_size = hidden_size
-        self.embedder = nn.Linear(input_size, embedding_dimension).to(device)
+        self.embedder = nn.Linear(input_size, embedding_dimension)
         self.embedding_dimension = embedding_dimension
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers).to(device)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers)
 
     def initiate_hidden(self, batch_size):
         return (

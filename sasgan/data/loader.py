@@ -6,7 +6,7 @@ import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 from nuscenes.utils.data_classes import LidarPointCloud
-from data_helpers import create_feature_matrix_for_cae
+from data.data_helpers import create_feature_matrix_for_cae
 from utils import config
 
 
