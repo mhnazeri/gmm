@@ -10,6 +10,7 @@ from typing import Dict
 import torch
 import logging
 import tensorflow as tf
+from sklearn.datasets import load_digits
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -170,6 +171,7 @@ def config(modeule_name: str=None) -> Dict[str, str]:
     except KeyError as err:
         print(f"Module name should be one of the:\n "
               f"{config.sections()} not {err}")
+
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ class Encoder(nn.Module):
         elif activation == "tanh":
             self.activation = nn.Tanh()
         else:
-            raise f"{activation} function is not supported"
+            raise "{} function is not supported".format(self.activation)
 
     def forward(self, x):
         x = self.activation(self.fc_1(x))
@@ -52,7 +52,7 @@ class Decoder(nn.Module):
         elif activation == "tanh":
             self.activation = nn.Tanh()
         else:
-            raise f"{activation} function is not supported"
+            raise "{} function is not supported".format(self.activation)
 
     def forward(self, x):
         x = self.activation(self.fc_1(x))
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     # root = "/home/nao/Projects/sasgan"
     root = paths["root"]
-    data = CAEDataset(os.path.join(root, paths["nuscenes_json"])
+    data = CAEDataset(os.path.join(root, paths["nuscenes_json"]))
     data = DataLoader(data, batch_size=cae_config["batch_size"], shuffle=True, num_workers=2, drop_last=True)
 
     make_cae(data, cae_config["input_dim"], cae_config["latent_dim"],
