@@ -68,7 +68,7 @@ class Encoder(nn.Module):
 ##################################################################################
 #                        Contextual Feature Extractor
 # ________________________________________________________________________________
-class Contextual_Features(nn.Module):
+class ContextualFeatures(nn.Module):
     """Extract contextual features from the environment
         Networks that can be used for feature extraction are:
             overfeat: returned matrix is 1024*12*12
@@ -137,7 +137,7 @@ class Fusion(nn.Module):
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.pool_dim = pool_dim
-        self.linear = nn.Linear(nn.Linear(56, pool_dim),
+        self.linear = nn.Sequential(nn.Linear(56, pool_dim),
                                 nn.MaxPool(kernel_size=2, stride=2))
         self.fuse = nn.LSTM(input_size=147619, hidden_size=256)
 
@@ -157,7 +157,7 @@ class Fusion(nn.Module):
     def rel_distance(agent_1, agent_2):
         return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
-    def forward(self, real_history, pool, context_feature, i):
+    def forward(self, real_history, pool, context_feature, agents_idx):
         """receives the whole feature matrix as input (max_agents * 56)
         28 is for 2 seconds input (each second is 2 frame, each frame has 14
         features)
@@ -167,25 +167,71 @@ class Fusion(nn.Module):
             context_feature: tensor of size=(1024, 12, 12)=147456
             i: desired agent number to forecast future
         """
-        agent = pool[i] # a vector of size 56
+        agent = pool[agents_idx] # a vector of size 56
         distances = []
         for j in range(len(pool)):
-            if j != i:
+            if j != agents_idx:
                 distances.append(rel_distance(agent, pool[j]))
 
         agent = self.linear(agent)
         agent = torch.cat((distances, agent), 1) # vector of 99 + 64 = 163
         context_feature = context_feature.view(-1) # 147456 digits
-        cat_features = torch.cat((context_feature, agent), 0) # 147619
+        cat_features = torch.cat((context_feature, agent), 1) # 147619
         cat_features = cat_features.view(-1, self.batch_size, self.pool_dim)
 
         _, fused_features_hidden, _ = self.fuse(cat_features,
                                                 self.initiate_hidden())
         # dim: 2 + 6 + 256 = 264
         fused_features_hidden = torch.cat(
-            (self.get_noise((2,)), real_history[i], fused_features_hidden),
+            (self.get_noise((2,)), real_history[agents_idx], fused_features_hidden),
             1)
         return fused_features_hidden
+
+##################################################################################
+#                               Generator
+# ________________________________________________________________________________
+class Generator(nn.Module):
+    """Trajectory generator"""
+    def __init__(self, input_size=264, hidden_size=264, num_layers=1):
+        super(Generator, self).__init__()
+        self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+                                num_layers, num_layers=num_layers)
+
+    def initiate_hidden(self):
+        return torch.zeros(1, self.batch_size, self.hidden_size)
+
+    def forward(self, traj, hidden_state):
+        hidden = (hidden_state, self.initiate_hidden())
+        traj, _ = self.decoder(traj, hidden)
+        return traj.view(-1, 70)
+
+
+##################################################################################
+#                               GAN Discriminator
+# ________________________________________________________________________________
+
+class TrajectoryDiscriminator(nn.Module):
+    """GAN Discriminator"""
+    def __init__(self, dropout=0):
+        super(TrajectoryDiscriminator, self).__init__()
+        self.encoder = Encoder(input_size=14, embedding_dimension=64, hidden_size=16, num_layers=1)
+        self.contextual_features = ContextualFeatures()
+        self.fusion = Fusion(pool_dim=64, hidden_size=128, batch_size=1)
+        self.mpl = nn.Sequential(
+            nn.Linear(264, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(1024, 1),
+            nn.ReLU()
+            )
+
+    def forward(self, traj, image, real_history, agent_idx):
+        traj = self.encoder(traj)
+        image = self.contextual_features(image)
+        encoded_traj = self.fusion(real_history, traj, image, agent_idx)
+        score = self.mlp(encoded_traj)
+        return score
 
 ##################################################################################
 #                              Testing the modules
