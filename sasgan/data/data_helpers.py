@@ -27,11 +27,11 @@ def read_file(file: str, feature: str = None):
     return data, appears
 
 
-def create_feature_matrix_for_cae(file):
+def create_feature_matrix(file):
     datum, timestamps, appears = read_file(file, "timestamp")
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
-    agents = np.zeros((len(datum[-1]), 560), dtype=np.double)
+    agents = np.zeros((len(datum[-1]), 560))
     # appears = (agent_num, start, stop)
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
@@ -45,7 +45,7 @@ def create_feature_matrix_for_cae(file):
             agent_data.extend([datum[-1][key][i]["movable"]])
             # print(f"{key}, start: {start}, stop: {stop}")
             # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
-            agents[num, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.double)
+            agents[num, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data)
         num += 1
 
     for id in range(num_frames):
@@ -61,8 +61,8 @@ def create_feature_matrix_for_cae(file):
         for i in range(40 - num_frames):
             ego.extend([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
 
-    ego = torch.tensor(ego, dtype=torch.double).reshape(-1, 560)
-    agents = torch.from_numpy(agents)
+    ego = torch.tensor(ego).reshape(-1, 560)
+    agents = torch.from_numpy(agents).float()
     datum = torch.cat((ego, agents), 0)
     # datum = torch.transpose(datum, 1, 0)
 
@@ -73,7 +73,7 @@ def create_feature_matrix_for_viz(file):
     datum, timestamps, appears = read_file(file, "timestamp")
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
-    agents = np.zeros((len(datum[-1]), 120), dtype=np.double)
+    agents = np.zeros((len(datum[-1]), 120))
     # appears = (agent_num, start, stop)
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
@@ -81,7 +81,7 @@ def create_feature_matrix_for_viz(file):
     for key, start, stop in appears:
         for i in range(stop - start):
             agent_data = datum[-1][key][i]["translation"]
-            agents[num, (start * 3) + (i * 3): (start + 1) * 3 + (i * 3)] = np.array(agent_data, dtype=np.double)
+            agents[num, (start * 3) + (i * 3): (start + 1) * 3 + (i * 3)] = np.array(agent_data)
         num += 1
 
     for id in range(num_frames):
@@ -91,8 +91,8 @@ def create_feature_matrix_for_viz(file):
         for i in range(40 - num_frames):
             ego.extend([0., 0., 0.])
 
-    ego = torch.tensor(ego, dtype=torch.double).reshape(-1, 120)
-    agents = torch.from_numpy(agents)
+    ego = torch.tensor(ego).reshape(-1, 120)
+    agents = torch.from_numpy(agents).float()
     datum = torch.cat((ego, agents), 0)
 
     return datum

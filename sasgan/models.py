@@ -192,7 +192,7 @@ class Fusion(nn.Module):
 # ________________________________________________________________________________
 class Generator(nn.Module):
     """Trajectory generator"""
-    def __init__(self, input_size=264, hidden_size=264, num_layers=1):
+    def __init__(self, input_size=264, hidden_size=7, num_layers=1):
         super(Generator, self).__init__()
         self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers, num_layers=num_layers)
