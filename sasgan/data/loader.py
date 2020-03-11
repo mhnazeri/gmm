@@ -4,9 +4,9 @@ import ujson as json
 from PIL import Image
 import torch
 from torchvision import transforms
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from nuscenes.utils.data_classes import LidarPointCloud
-from data_helpers import create_feature_matrix
+from data.data_helpers import create_feature_matrix
 
 
 def seq_collate(data):
@@ -34,10 +34,11 @@ class NuSceneDataset_copy(Dataset):
     """nuScenes dataset includes lidar data, camera images, positions, physical features
     """
 
-    def __init__(self,  root_dir: str, transform=None):
+    def __init__(self,  root_dir: str, transform=None, only_features=False):
         """str root_dir: json files directory"""
         self.root_dir = root_dir
         self.transform = transform
+        self.only_features = only_features
         json_files = os.path.join(root_dir, "exported_json_data")
         image_files = os.path.join(root_dir, "nuScene-mini")
         files = os.listdir(json_files)
@@ -47,10 +48,12 @@ class NuSceneDataset_copy(Dataset):
         self.features = []
 
         for file in files:
-            lidar_address, camera_address = self.read_file(file)
-            for cam in camera_address:
-                self.images.append(
-                    transform(Image.open(os.path.join(image_files, cam))).squeeze())
+            if not only_features:
+                lidar_address, camera_address = self.read_file(file)
+                for cam in camera_address:
+                    self.images.append(
+                        transform(Image.open(os.path.join(image_files, cam))).squeeze() if transform else Image.open(os.path.join(image_files, cam))
+                        )
 
             features = create_feature_matrix(file)
             dummy = torch.zeros(100 - len(features), 560)
@@ -79,16 +82,20 @@ class NuSceneDataset_copy(Dataset):
         sample = {}
         start, stop = self.start_stop[idx]
         # all agents (rows), specific columns (timestamps)
-        sample["features"] = self.features[:, start: stop]
-        sample["image"] = self.images[idx]
+        # out = (features, rel_feature, images, motions)
         if idx % 39 == 0:
-            sample["rel_features"] = self.features[:, start: stop]
-            sample["motion"] = torch.zeros_like(self.images[idx])
+            out = [
+            self.features[:, start: stop], self.features[:, start: stop],]
+            if not self.only_features:
+                out.extend([self.images[idx], torch.zeros_like(self.images[idx].shape)])
         else:
-            sample["rel_features"] = self.rel_features[:, start: stop]
-            sample["motion"] = self.images[idx] - self.images[idx - 1]
+            out = [
+            self.features[:, start: stop], self.rel_features[:, start: stop],]
+            if not self.only_features:
+                out.extend([self.images[idx], self.images[idx] - self.images[idx - 1]]
+                )
 
-        return sample
+        return out
 
     def read_file(self, file: str, feature: str = None):
         """
@@ -176,15 +183,11 @@ class CAEDataset(Dataset):
 
     """
 
-    def __init__(self, json_file: str, root_dir: str, transform=None):
-        self.scene_frames = create_feature_matrix(json_file)
+    def __init__(self, root_dir: str, json_file: str):
+        self.scene_frames = create_feature_matrix(os.path.join(root_dir,json_file))
         self.root_dir = root_dir
-        self.transform = transform
         dummy = torch.zeros(100 - len(self.scene_frames), 560)
         self.scene_frames = torch.cat((self.scene_frames, dummy), 0)
-        # if you want read the list 5 element at a time
-        t = list(zip(l[::28], l[28::28]))
-        self.start_stop = [l[x[0]:x[1]] for x in t]
 
     def __len__(self):
         return len(self.scene_frames)
@@ -197,7 +200,7 @@ class CAEDataset(Dataset):
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        start, stop = self.start_stop[idx]
+        # start, stop = self.start_stop[idx]
         # all agents (rows), specific columns (timestamps)
         # sample = self.scene_frames[:, start: stop]
         sample = self.scene_frames[idx]
@@ -209,9 +212,6 @@ class CAEDataset(Dataset):
         # lidar = LidarPointCloud.from_file(lidar_name)
         # frames = self.scene_frames[idx, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)]
         # sample = {'frames': self.scene_frames, 'image': image, 'lidar': lidar}
-
-        if self.transform:
-            sample = self.transform(sample)
 
         return sample
 
@@ -244,4 +244,8 @@ if __name__ == '__main__':
         transforms.ToTensor(),
     ])
     data = NuSceneDataset_copy("/home/nao/Projects/sasgan/sasgan/data/", transform=transforms)
-    print(len(data))
+    # print(len(data.__getitem__(0)))
+    # data = CAEDataset("/home/nao/Projects/sasgan/sasgan/data/", "exported_json_data/scene-0061.json")
+    # data = DataLoader(data, batch_size=1, shuffle=True, num_workers=2, drop_last=True)
+    d = data.__getitem__(0)[0]
+    print(d.shape)

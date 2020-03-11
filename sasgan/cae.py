@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from data.loader import CAEDataset
+from data.loader import NuSceneDataset_copy
 from utils import config
 
 
@@ -31,6 +31,7 @@ class Encoder(nn.Module):
             raise "{} function is not supported".format(self.activation)
 
     def forward(self, x):
+        x = x.view(-1, self.n_inputs)
         x = self.activation(self.fc_1(x))
         return self.fc_2(x)
 
@@ -55,6 +56,7 @@ class Decoder(nn.Module):
             raise "{} function is not supported".format(self.activation)
 
     def forward(self, x):
+        x = x.view(-1, self.n_latent)
         x = self.activation(self.fc_1(x))
         return self.fc_2(x)
 
@@ -62,12 +64,15 @@ class Decoder(nn.Module):
 def loss_function(output_encoder, outputs, inputs, lamda=1e-4):
 
     criterion = nn.BCEWithLogitsLoss()
+
     assert (
         outputs.shape == inputs.shape
     ), f"outputs.shape : {outputs.shape} != inputs.shape : {inputs.shape}"
+
     loss1 = criterion(outputs, inputs)
 
     output_encoder.backward(torch.ones(output_encoder.size()), retain_graph=True)
+
     inputs.grad.requires_grad = True
     # Frobenious norm, the square root of sum of all elements (square value)
     # in a jacobian matrix
@@ -87,33 +92,36 @@ def make_cae(
     activation="sigmoid",
 ):
     """create the whole cae"""
-    encoder = Encoder(n_inputs, n_hidden, n_latent, activation).double()
-    decoder = Decoder(n_inputs, n_hidden, n_latent, activation).double()
+    encoder = Encoder(n_inputs, n_hidden, n_latent, activation)
+    decoder = Decoder(n_inputs, n_hidden, n_latent, activation)
 
     optimizer = optim.Adam(
-        [{"params": encoder.parameters()}, {"params": decoder.parameters()}], lr=0.005
+        list(encoder.parameters()) + list(decoder.parameters()), lr=0.005
     )
     losses = []
     loss = torch.tensor([0])
-    for e in range(epochs):
+    for e in range(1, epochs + 1):
         print(f"epoch: {e}")
 
-        for i_batch, samples in enumerate(dataloader_train):
+        for i, samples in enumerate(dataloader_train, 1):
+            # change (batch, 100, n_inputs) to (100, n_inputs)
+            samples = samples[0].view(-1, n_inputs)
+
             samples.requires_grad = True
+            samples.retain_grad()
 
             outputs_encoder = encoder(samples)
 
-            samples.retain_grad()
             outputs = decoder(outputs_encoder)
             loss = loss_function(outputs_encoder, outputs, samples)
 
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
 
         losses.append(loss)
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
-        torch.save(encoder.state_dict(), f"./models/model_{e}.pt")
+        torch.save(encoder.state_dict(), f"./models_state/model_cae_{e}.pt")
 
     plt.plot(range(50), losses, "r-")
     plt.xlabel("# Epochs")
@@ -127,9 +135,10 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     # root = "/home/nao/Projects/sasgan"
     root = paths["root"]
-    data = CAEDataset(os.path.join(root, paths["nuscenes_json"]))
-    data = DataLoader(data, batch_size=cae_config["batch_size"], shuffle=True, num_workers=2, drop_last=True)
+    data = NuSceneDataset_copy("/home/nao/Projects/sasgan/sasgan/data/",
+                                only_features=True)
+    data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    make_cae(data, cae_config["input_dim"], cae_config["latent_dim"],
-             cae_config["hidden_dim"], cae_config["batch_size"],
-             cae_config["epochs"], cae_config["activation"])
+    make_cae(data, int(cae_config["input_dim"]), int(cae_config["embed_dim"]),
+             int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
+             int(cae_config["epochs"]), cae_config["activation"])
