@@ -17,12 +17,10 @@ def seq_collate(data):
     seq_start_end = [[start, end]
                      for start, end in zip(cum_start_idx, cum_start_idx[1:])]
 
-    # Data format: batch, input_size, seq_len
-    # LSTM input format: seq_len, batch, input_size
-    features = torch.cat(features_list, dim=0).permute(2, 0, 1)
-    rel_features = torch.cat(rel_features_list, dim=0).permute(2, 0, 1)
-    image = torch.cat(image_list, dim=0).permute(2, 0, 1)
-    motion = torch.cat(motion_list, dim=0).permute(2, 0, 1)
+    features = torch.cat(features_list, dim=0)
+    rel_features = torch.cat(rel_features_list, dim=0)
+    image = torch.cat(image_list, dim=0)
+    motion = torch.cat(motion_list, dim=0)
     out = [
         features, rel_features, image, motion
     ]
@@ -183,14 +181,25 @@ class CAEDataset(Dataset):
 
     """
 
-    def __init__(self, root_dir: str, json_file: str):
-        self.scene_frames = create_feature_matrix(os.path.join(root_dir,json_file))
+    def __init__(self, root_dir: str):
+        # self.scene_frames = create_feature_matrix(os.path.join(root_dir,json_file))
         self.root_dir = root_dir
-        dummy = torch.zeros(100 - len(self.scene_frames), 560)
-        self.scene_frames = torch.cat((self.scene_frames, dummy), 0)
+        json_files = os.path.join(root_dir, "exported_json_data")
+        files = os.listdir(json_files)
+        files = [os.path.join(json_files, _path) for _path in files]
+        self.features = []
+
+        for file in files:
+            features = create_feature_matrix(file)
+            self.features.append(features)
+
+        self.features = torch.cat(self.features, dim=0)
+
+        num_features = list(range(self.features.shape[1]))
+        self.start_stop = list(zip(num_features[::14], num_features[14::14]))
 
     def __len__(self):
-        return len(self.scene_frames)
+        return len(self.features)
 
     def __getitem__(self, idx):
         """
@@ -200,10 +209,12 @@ class CAEDataset(Dataset):
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
+
         # start, stop = self.start_stop[idx]
+        # self.features[:, start: stop]
         # all agents (rows), specific columns (timestamps)
-        # sample = self.scene_frames[:, start: stop]
-        sample = self.scene_frames[idx]
+        # sample = self.features[:, start: stop]
+        sample = self.features[idx]
         # img_name = os.path.join(self.root_dir,
         #                         self.camera_address[idx])
         # lidar_name = os.path.join(self.root_dir,

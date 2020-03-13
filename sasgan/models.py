@@ -25,7 +25,7 @@ tensorboard_logger = Logger()
 #                                    Encoder
 # ________________________________________________________________________________
 class Encoder(nn.Module):
-    def __init__(self, input_size: int = 14, embedding_dimension: int = 64, hidden_size: int = 16, num_layers:int = 1):
+    def __init__(self, input_size: int = 7, embedding_dimension: int = 64, hidden_size: int = 16, num_layers:int = 1):
         """
         :param input_size: The size of each vector representing an agent in a frame containing all the features
         :param embedding_dimension: The size in which the input features will be embedded to
@@ -36,9 +36,9 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.num_layers = 32
         self.hidden_size = hidden_size
-        self.embedder = nn.Linear(input_size, embedding_dimension)
-        self.embedding_dimension = embedding_dimension
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers)
+        # self.embedder = nn.Linear(input_size, embedding_dimension)
+        # self.embedding_dimension = embedding_dimension
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
     def initiate_hidden(self, batch_size):
         return (
@@ -55,12 +55,12 @@ class Encoder(nn.Module):
         # Check the integrity of the shapes
         logger.debug("The size of the inputs: " + str(inputs.size()))
 
-        batch_size = inputs.size(1)
-        embed = self.embedder(inputs.view(-1, 2))
-        embed = embed.view(-1, batch_size, self.embedding_dimension)
+        # batch_size = inputs.size(1)
+        # embed = self.embedder(inputs.view(-1, 2))
+        inputs = inputs.view(batch_size, 100, -1)
 
         states = self.initiate_hidden(batch_size)
-        _, hidden_state, _ = self.lstm(embed, states)
+        _, hidden_state, _ = self.lstm(inputs, states)
 
         return hidden_state
 
@@ -108,20 +108,19 @@ class ContextualFeatures(nn.Module):
 
 
     def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
-        frame = self.background_motion(frame_1, frame_2)
+        # frame = self.background_motion(frame_1, frame_2)
         frame = self.layer_1(frame)
         frame = self.layer_2(frame)
         frame = self.layer_3(frame)
         frame = self.layer_4(frame)
         frame = self.layer_5(frame)
-        if frame.shape != (1024, 12, 12):
-            frame = frame.view(1024, 12, 12)
+        # self-attention gan
         frame_fx = self.frame_fx(frame)
         frame_gx = self.frame_gx(frame)
         frame_hx = self.frame_hx(frame)
         frame = nn.Softmax2d(frame_fx.transpose_(2, 1).matmul(frame_gx), dim=1)
         frame = frame_hx.matmul(frame)
-        return self.frame_vx(frame).view(1024, 12, 12)
+        return self.frame_vx(frame).view(-1, 1024, 12, 12)
 
     def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
         """returns background motion between two consequtive frames"""
@@ -168,16 +167,16 @@ class Fusion(nn.Module):
             i: desired agent number to forecast future
         """
         agent = pool[agents_idx] # a vector of size 56
-        distances = []
-        for j in range(len(pool)):
-            if j != agents_idx:
-                distances.append(rel_distance(agent, pool[j]))
+        # distances = []
+        # for j in range(len(pool)):
+        #     if j != agents_idx:
+        #         distances.append(rel_distance(agent, pool[j]))
 
         agent = self.linear(agent)
         agent = torch.cat((distances, agent), 1) # vector of 99 + 64 = 163
         context_feature = context_feature.view(-1) # 147456 digits
         cat_features = torch.cat((context_feature, agent), 1) # 147619
-        cat_features = cat_features.view(-1, self.batch_size, self.pool_dim)
+        cat_features = cat_features.view(self.batch_size, -1, self.pool_dim)
 
         _, fused_features_hidden, _ = self.fuse(cat_features,
                                                 self.initiate_hidden())

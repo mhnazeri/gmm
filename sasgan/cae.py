@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from data.loader import NuSceneDataset_copy
+from data.loader import CAEDataset
 from utils import config
 
 
@@ -104,8 +104,17 @@ def make_cae(
         print(f"epoch: {e}")
 
         for i, samples in enumerate(dataloader_train, 1):
-            # change (batch, 100, n_inputs) to (100, n_inputs)
-            samples = samples[0].view(-1, n_inputs)
+            # change (batch, 100, n_inputs) to (100, n_inputs) if use NuSceneDataloader
+            # samples = samples[0].view(-1, n_inputs)
+            samples = samples.view(-1, n_inputs)
+
+            # remove zero rows
+            # valid_rows = []
+            # for row_idx in range(samples.size(0)):
+            #     if not torch.all(samples[row_idx, :] == 0):
+            #         valid_rows.append(row_idx)
+
+            # samples = samples[valid_rows, :]
 
             samples.requires_grad = True
             samples.retain_grad()
@@ -131,12 +140,9 @@ def make_cae(
 
 if __name__ == "__main__":
     cae_config = config("CAE")
-    paths = config("Paths")
+    root = config("Paths")["data_root"]
     torch.manual_seed(42)
-    # root = "/home/nao/Projects/sasgan"
-    root = paths["root"]
-    data = NuSceneDataset_copy("/home/nao/Projects/sasgan/sasgan/data/",
-                                only_features=True)
+    data = CAEDataset(root)
     data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
     make_cae(data, int(cae_config["input_dim"]), int(cae_config["embed_dim"]),
