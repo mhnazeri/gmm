@@ -28,7 +28,7 @@ def seq_collate(data):
     return tuple(out)
 
 
-class NuSceneDataset_copy(Dataset):
+class NuSceneDataset(Dataset):
     """nuScenes dataset includes lidar data, camera images, positions, physical features
     """
 
@@ -59,9 +59,11 @@ class NuSceneDataset_copy(Dataset):
             self.features.append(features)
 
         self.features = torch.cat(self.features, dim=1)
-        self.rel_features = self.features[:, 1:] - self.features[:, : -1]
+        self.rel_features = self.features[:, 14::14] - self.features[:, :-14:14]
+        self.rel_features = torch.cat(torch.zero(100, 14), self.rel_features, 1)
         # read the list 14 element at a time
         num_features = list(range(self.features.shape[1]))
+        # num_features = [x + 14 for x in range(self.features.shape[1] - 1)]
         self.start_stop = list(zip(num_features[::14], num_features[14::14]))
         # self.start_stop = [l[x[0]:x[1]] for x in t]
 
@@ -81,9 +83,9 @@ class NuSceneDataset_copy(Dataset):
         start, stop = self.start_stop[idx]
         # all agents (rows), specific columns (timestamps)
         # out = (features, rel_feature, images, motions)
-        if idx % 39 == 0:
+        if idx % 40 == 0:
             out = [
-            self.features[:, start: stop], self.features[:, start: stop],]
+            self.features[:, start: stop], torch.zeros_like(self.features[:, start: stop]),]
             if not self.only_features:
                 out.extend([self.images[idx], torch.zeros_like(self.images[idx].shape)])
         else:
@@ -115,65 +117,6 @@ class NuSceneDataset_copy(Dataset):
             camera_address.append(ego[i]["camera"])
 
         return lidar_address, camera_address
-
-
-# class NuSceneDataset(Dataset):
-#     """nuScenes dataset includes lidar data, camera images, positions, physical features
-#     """
-
-#     def __init__(self,  root_dir: str, json_file: str, transform=None):
-#         self.lidar_address, self.camera_address = self.read_file(json_file)
-#         self.root_dir = root_dir
-#         self.transform = transform
-
-#     def __len__(self):
-#         return len(self.lidar_address)
-
-#     def __getitem__(self, idx):
-#         """
-#         return desired train data with index idx.
-#         :param int idx: train data index
-#         :return: row idx of train dataset
-#         """
-#         if torch.is_tensor(idx):
-#             idx = idx.tolist()
-
-#         sample = Image.open(osp.join(self.root_dir, self.camera_address[idx]))
-
-#         # img_name = os.path.join(self.root_dir,
-#         #                         self.camera_address[idx])
-#         # lidar_name = os.path.join(self.root_dir,
-#         #                         self.lidar_address[idx])
-#         # image = torch.from_numpy(imread(img_name))
-#         # lidar = LidarPointCloud.from_file(lidar_name)
-#         # frames = self.scene_frames[idx, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)]
-#         # sample = {'frames': self.scene_frames, 'image': image, 'lidar': lidar}
-
-#         if self.transform:
-#             sample = self.transform(sample).squeeze()
-
-#         return sample
-
-#     def read_file(self, file: str, feature: str = None):
-#         """
-#         read json file of a scene.
-#         separate different agent's lidar, camera features
-#         :param str file: file name of the scene.
-#         :param feature: desired feature. (not using this feature currently)
-#         :return:
-#         """
-#         with open(file, "r") as f:
-#             data = json.load(f)
-
-#         ego = data[:-1]
-#         lidar_address = []
-#         camera_address = []
-
-#         for i in range(len(ego)):
-#             lidar_address.append(ego[i]["lidar"])
-#             camera_address.append(ego[i]["camera"])
-
-#         return lidar_address, camera_address
 
 
 class CAEDataset(Dataset):
