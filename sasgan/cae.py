@@ -135,7 +135,6 @@ def make_cae(
     plt.plot(range(50), losses, "r-")
     plt.xlabel("# Epochs")
     plt.ylabel("Binary Cross Entropy with Logits Loss")
-    plt.show()
 
 
 if __name__ == "__main__":
@@ -145,6 +144,13 @@ if __name__ == "__main__":
     data = CAEDataset(root)
     data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    make_cae(data, int(cae_config["input_dim"]), int(cae_config["embed_dim"]),
-             int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
-             int(cae_config["epochs"]), cae_config["activation"])
+    plt.figure(figsize=[10, 10])
+    latents_list = list(range(1, 8))
+    for i, latent in enumerate(latents_list):
+        plt.subplot(3, 3, i + 1)
+        plt.title("latent_dimension: %d"%latent)
+        make_cae(data, int(cae_config["input_dim"]), latent,
+                 int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
+                 int(cae_config["epochs"]), cae_config["activation"])
+
+    plt.show()
