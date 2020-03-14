@@ -74,7 +74,7 @@ class ContextualFeatures(nn.Module):
             overfeat: returned matrix is 1024*12*12
     """
     def __init__(self, model_arch: str="overfeat"):
-        super(Contextual_Features, self).__init__()
+        super(ContextualFeatures, self).__init__()
         if model_arch == "overfeat":
             self.layer_1 = nn.Sequential(
                 nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
