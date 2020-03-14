@@ -64,8 +64,8 @@ tensorflow_logger.figure_summary("Testing the figure", figure)
 TODO list:
 - [x] Data loader
 - [ ] Visualization
-- [ ] Network module
-- [ ] Self-attention module
+- [x] Network module
+- [x] Self-attention module
 - [ ] ADE and FDE
 - [ ] Train loop
 - [ ] Test loop

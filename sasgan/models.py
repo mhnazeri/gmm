@@ -25,7 +25,7 @@ tensorboard_logger = Logger()
 #                                    Encoder
 # ________________________________________________________________________________
 class Encoder(nn.Module):
-    def __init__(self, input_size: int = 7, embedding_dimension: int = 64, hidden_size: int = 16, num_layers:int = 1):
+    def __init__(self, input_size: int = 7, embedding_dimension: int = 64, hidden_size: int = 32, num_layers:int = 1):
         """
         :param input_size: The size of each vector representing an agent in a frame containing all the features
         :param embedding_dimension: The size in which the input features will be embedded to
@@ -98,13 +98,13 @@ class ContextualFeatures(nn.Module):
             # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
             #self-attention method proposed in self-attention gan Zhang et al.
             self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=3, stride=1, padding=1)
+                                 kernel_size=1, stride=1)
             self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=3, stride=1, padding=1)
+                                 kernel_size=1, stride=1)
             self.frame_hx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=3, stride=1, padding=1)
+                                 kernel_size=1, stride=1)
             self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=3, stride=1, padding=1)
+                                 kernel_size=1, stride=1)
 
 
     def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
@@ -122,23 +122,25 @@ class ContextualFeatures(nn.Module):
         frame = frame_hx.matmul(frame)
         return self.frame_vx(frame).view(-1, 1024, 12, 12)
 
-    def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
-        """returns background motion between two consequtive frames"""
-        return frame_2 - frame_1
+    # def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
+    #     """returns background motion between two consequtive frames"""
+    #     return frame_2 - frame_1
 
 ##################################################################################
 #                               Fusion modules
 # ________________________________________________________________________________
 class Fusion(nn.Module):
     """Feature Pool and Fusion module"""
-    def __init__(self, pool_dim=64, hidden_size=128, batch_size=1):
+    def __init__(self, pool_dim=256, hidden_size=128, batch_size=1):
         super(Fusion, self).__init__()
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.pool_dim = pool_dim
-        self.linear = nn.Sequential(nn.Linear(56, pool_dim),
-                                nn.MaxPool(kernel_size=2, stride=2))
-        self.fuse = nn.LSTM(input_size=147619, hidden_size=256)
+        # can be removed
+        self.linear = nn.Sequential(nn.Linear(147_456, pool_dim),
+                                    nn.MaxPool(kernel_size=2, stride=2),
+                                    nn.ReLU())
+        self.fuse = nn.LSTM(input_size=295, hidden_size=256, batch_first=True)
 
     def initiate_hidden(self):
         return (
@@ -153,36 +155,34 @@ class Fusion(nn.Module):
             return torch.rand(*shape).sub_(0.5).mul_(2.0).cuda()
         raise ValueError('Unrecognized noise type "%s"' % noise_type)
 
-    def rel_distance(agent_1, agent_2):
-        return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
+    # def rel_distance(agent_1, agent_2):
+    #     return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
-    def forward(self, real_history, pool, context_feature, agents_idx):
+    def forward(self, real_history, rel_history, pool, context_feature, agent_idx):
         """receives the whole feature matrix as input (max_agents * 56)
         28 is for 2 seconds input (each second is 2 frame, each frame has 14
         features)
         args:
-            real_history: a matrix containing unmodified past locations
-            pool: modified past locations
+            real_history: a matrix containing unmodified past locations (100,7)
+            pool: modified past locations (100, 32)
             context_feature: tensor of size=(1024, 12, 12)=147456
             i: desired agent number to forecast future
         """
-        agent = pool[agents_idx] # a vector of size 56
-        # distances = []
-        # for j in range(len(pool)):
-        #     if j != agents_idx:
-        #         distances.append(rel_distance(agent, pool[j]))
+        agent = pool[agent_idx] # a vector of size 32
+        agent_rel = rel_history[agent_idx][:7] # vector of size 7
 
-        agent = self.linear(agent)
-        agent = torch.cat((distances, agent), 1) # vector of 99 + 64 = 163
-        context_feature = context_feature.view(-1) # 147456 digits
-        cat_features = torch.cat((context_feature, agent), 1) # 147619
-        cat_features = cat_features.view(self.batch_size, -1, self.pool_dim)
+        # agent = self.linear(agent)
+        agent = torch.cat((agent_rel, agent), 1) # vector of 7 + 32 = 39
+        context_feature = context_feature.view(self.batch_size, -1) # 147456 digits
+        context_feature = self.linear(context_feature) # vector of size 128
+        cat_features = torch.cat((context_feature, agent), 1) # 295
+        cat_features = cat_features.view(self.batch_size, -1, 295)
 
         _, fused_features_hidden, _ = self.fuse(cat_features,
                                                 self.initiate_hidden())
-        # dim: 2 + 6 + 256 = 264
+        # dim: 5 + 3 + 256 = 264
         fused_features_hidden = torch.cat(
-            (self.get_noise((2,)), real_history[agents_idx], fused_features_hidden),
+            (self.get_noise((5,)), real_history[agent_idx], fused_features_hidden),
             1)
         return fused_features_hidden
 
@@ -191,16 +191,17 @@ class Fusion(nn.Module):
 # ________________________________________________________________________________
 class Generator(nn.Module):
     """Trajectory generator"""
-    def __init__(self, input_size=264, hidden_size=7, num_layers=1):
+    def __init__(self, input_size=264, hidden_size=32, num_layers=1):
         super(Generator, self).__init__()
         self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                                num_layers, num_layers=num_layers)
+                                num_layers=num_layers, batch_first=True)
 
     def initiate_hidden(self):
         return torch.zeros(1, self.batch_size, self.hidden_size)
 
     def forward(self, traj, hidden_state):
         hidden = (hidden_state, self.initiate_hidden())
+        traj = traj.view(traj.size(0), -1, 264) # traj.size(1)=264
         traj, _ = self.decoder(traj, hidden)
         return traj.view(-1, 70)
 

@@ -16,7 +16,7 @@ from utils import config
 class Encoder(nn.Module):
     """Encoder network of CAE"""
 
-    def __init__(self, n_inputs=14, n_hidden=28, n_latent=1, activation="sigmoid"):
+    def __init__(self, n_inputs=14, n_hidden=28, n_latent=7, activation="sigmoid"):
         super(Encoder, self).__init__()
         self.n_inputs = n_inputs
         self.n_latent = n_latent
