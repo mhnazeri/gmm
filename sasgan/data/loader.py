@@ -79,9 +79,8 @@ class NuSceneDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        sample = {}
         start, stop = self.start_stop[idx]
-        # all agents (rows), specific columns (timestamps)
+        # all agents (rows), specific column (timestamp)
         # out = (features, rel_feature, images, motions)
         if idx % 40 == 0:
             out = [

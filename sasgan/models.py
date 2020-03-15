@@ -107,7 +107,7 @@ class ContextualFeatures(nn.Module):
                                  kernel_size=1, stride=1)
 
 
-    def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
+    def forward(self, frame: np.ndarray):
         # frame = self.background_motion(frame_1, frame_2)
         frame = self.layer_1(frame)
         frame = self.layer_2(frame)
@@ -121,10 +121,6 @@ class ContextualFeatures(nn.Module):
         frame = nn.Softmax2d(frame_fx.transpose_(2, 1).matmul(frame_gx), dim=1)
         frame = frame_hx.matmul(frame)
         return self.frame_vx(frame).view(-1, 1024, 12, 12)
-
-    # def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
-    #     """returns background motion between two consequtive frames"""
-    #     return frame_2 - frame_1
 
 ##################################################################################
 #                               Fusion modules
@@ -203,7 +199,7 @@ class Generator(nn.Module):
         hidden = (hidden_state, self.initiate_hidden())
         traj = traj.view(traj.size(0), -1, 264) # traj.size(1)=264
         traj, _ = self.decoder(traj, hidden)
-        return traj.view(-1, 70)
+        return traj
 
 
 ##################################################################################
