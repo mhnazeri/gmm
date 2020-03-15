@@ -12,9 +12,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from data.loader import CAEDataset
 from utils import config
+from utils import Logger
 import seaborn as sns
 sns.set(color_codes=True)
-
+tensorboard_logger = Logger("./logs")
 
 class Encoder(nn.Module):
     """Encoder network of CAE"""
@@ -131,6 +132,7 @@ def make_cae(
             loss.backward()
             optimizer.step()
 
+        tensorboard_logger.scalar_summary("Latent_dimension %d"%(n_latent), loss.item(), e)
         losses.append(loss.item())
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
         torch.save(encoder.state_dict(), f"./models_state/model_cae_{e}.pt")
@@ -154,4 +156,3 @@ if __name__ == "__main__":
         make_cae(data, int(cae_config["input_dim"]), latent,
                  int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
                  int(cae_config["epochs"]) , cae_config["activation"])
-    plt.show()
