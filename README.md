@@ -12,12 +12,19 @@ The sasgan architecture consists of two separate networks, the first one is resp
 social pooling, and generato </figcaption>
 </div>
 
+## Results of using different latent dimensions for CAE:
+<div align="center">
+    <img align="center" src="images/CAE.png" alt="" width=600px>
+    <figcaption>Figure 2: CAE results,
+social pooling, and generato </figcaption>
+</div>
 
-## Tutorial on how to use the logger class: 
+
+## Tutorial on how to use the logger class:
 I have to recall that this class works with tensorboard and is independant of the python logger package.
 
 
-### functions: 
+### functions:
 On any part of your modules, if you need to plot or visualize any tensor or image use
 the implemented functions in this class.
 1. scalar_suammary:
@@ -69,4 +76,3 @@ TODO list:
 - [ ] ADE and FDE
 - [ ] Train loop
 - [ ] Test loop
-
