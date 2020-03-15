@@ -6,11 +6,14 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from data.loader import CAEDataset
 from utils import config
+import seaborn as sns
+sns.set(color_codes=True)
 
 
 class Encoder(nn.Module):
@@ -128,13 +131,13 @@ def make_cae(
             loss.backward()
             optimizer.step()
 
-        losses.append(loss)
+        losses.append(loss.item())
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
         torch.save(encoder.state_dict(), f"./models_state/model_cae_{e}.pt")
 
-    plt.plot(range(50), losses, "r-")
-    plt.xlabel("# Epochs")
-    plt.ylabel("Binary Cross Entropy with Logits Loss")
+    plt.plot(range(epochs), np.asarray(losses) / 10000, "r-")
+    plt.xlabel("# Epochs", size=7), plt.yticks(np.linspace(np.min(losses), np.max(losses), int(epochs/4)) / 10000, size=5)
+    plt.xticks(list(range(0, epochs, int(epochs/10))), size=5), plt.ylabel("Binary Cross Entropy with Logits Loss / 1000", size=7)
 
 
 if __name__ == "__main__":
@@ -144,13 +147,11 @@ if __name__ == "__main__":
     data = CAEDataset(root)
     data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    plt.figure(figsize=[10, 10])
-    latents_list = list(range(1, 8))
+    latents_list = list(range(1, 2))
     for i, latent in enumerate(latents_list):
         plt.subplot(3, 3, i + 1)
         plt.title("latent_dimension: %d"%latent)
         make_cae(data, int(cae_config["input_dim"]), latent,
                  int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
-                 int(cae_config["epochs"]), cae_config["activation"])
-
+                 int(cae_config["epochs"]) , cae_config["activation"])
     plt.show()
