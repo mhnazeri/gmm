@@ -14,7 +14,7 @@ social pooling, and generato </figcaption>
 
 ## Results of using different latent dimensions for CAE:
 <div align="center">
-    <img align="center" src="images/CAE.png" alt="" width=600px>
+    <img align="center" src="images/CAE.png" alt="" width=900px>
     <figcaption>Figure 2: CAE results,
 social pooling, and generato </figcaption>
 </div>
