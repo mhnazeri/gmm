@@ -4,35 +4,17 @@ import ujson as json
 from PIL import Image
 import torch
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
-from nuscenes.utils.data_classes import LidarPointCloud
+from torch.utils.data import Dataset
 from data.data_helpers import create_feature_matrix
-
-
-def seq_collate(data):
-    (feaures_list, rel_features_list, image_list, motion_list) = zip(*data)
-
-    _len = [len(seq) for seq in features_list]
-    cum_start_idx = [0] + np.cumsum(_len).tolist()
-    seq_start_end = [[start, end]
-                     for start, end in zip(cum_start_idx, cum_start_idx[1:])]
-
-    features = torch.cat(features_list, dim=0)
-    rel_features = torch.cat(rel_features_list, dim=0)
-    image = torch.cat(image_list, dim=0)
-    motion = torch.cat(motion_list, dim=0)
-    out = [
-        features, rel_features, image, motion
-    ]
-
-    return tuple(out)
+# from nuscenes.utils.data_classes import LidarPointCloud
 
 
 class NuSceneDataset(Dataset):
-    """nuScenes dataset includes lidar data, camera images, positions, physical features
+    """nuScenes dataset loader
+    each sample is a dictionary with keys: past, rel_past, future, motion
     """
 
-    def __init__(self,  root_dir: str, transform=None):
+    def __init__(self,  root_dir: str, max_agent: int=100, transform=None):
         """str root_dir: json files directory"""
         self.root_dir = root_dir
         self.transform = transform
@@ -44,44 +26,52 @@ class NuSceneDataset(Dataset):
         lidar = []
         features = []
         self.data = []
+        # read the list 14 element at a time
+        num_features = list(range(560))
+        start_stop = list(zip(num_features[::14], num_features[14::14]))
+
         for file in files:
             lidar_address, camera_address = self.read_file(file)
-            for cam in camera_address:
-                images.append(
-                    transform(Image.open(os.path.join(image_files, cam))).squeeze()
-                    )
+            # for cam in camera_address:
+            #     images.append(
+            #         transform(Image.open(os.path.join(image_files, cam))).squeeze()
+            #         )
 
             features = create_feature_matrix(file)
-            dummy = torch.zeros(100 - len(features), 560)
+            dummy = torch.zeros(max_agent - len(features), 560)
             features = torch.cat((features, dummy), 0)
-
-            # read the list 14 element at a time
-            num_features = list(range(features.shape[1]))
-            start_stop = list(zip(num_features[::14], num_features[14::14]))
             data = {}
-
             stamp = 0
-            while stamp < 30:
+
+            while stamp < 26:
                 past = []
                 future = []
                 image = []
+                # print(stamp)
                 # if stamp % 40 == 0:
                 for j in range(4):
                     past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
-                    image.append(images[stamp + j])
+
+                    image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
 
                 for j in range(4, 14):
                     future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
 
+                image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
+                rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
+                rel_past.insert(0, torch.zeros_like(past[0]))
                 data["past"] = past
                 data["future"] = future
+                image.insert(0, torch.zeros_like(image[0]))
+                data["rel_past"] = rel_past
                 data["motion"] = image
 
                 self.data.append(data)
                 data = {}
+                stamp += 1
 
     def __len__(self):
-        return len(self.start_stop)
+        return len(self.data)
 
     def __getitem__(self, idx):
         """
@@ -213,5 +203,11 @@ if __name__ == '__main__':
     # print(len(data.__getitem__(0)))
     # data = CAEDataset("/home/nao/Projects/sasgan/sasgan/data/", "exported_json_data/scene-0061.json")
     # data = DataLoader(data, batch_size=1, shuffle=True, num_workers=2, drop_last=True)
-    d = data.__getitem__(0)
-    print(d)
+    d = data.__getitem__(1)
+    print(len(data))
+    # print(d)
+    # print(d["past"])
+    print(type(d["rel_past"]))
+    print(len(d["rel_past"]))
+    print(type(d["rel_past"][0]))
+    print(d["rel_past"][0].shape)
