@@ -77,6 +77,47 @@ def _sample_annotations(nusc, instance):
 
     return annotation
 
+def calibrated_sensor_feature_extractor(nusc, scene_index):
+    """
+    extract calibrated sensor data from objects in a specific scene(position of objects catched by sensors in a scene)
+
+    :param nusc: nuScenes dataset
+    :param scene_index: our target scene
+    :returns sensor_data_list: a list of all sensors calibrated in scene
+    """
+    frames = sample_extractor(nusc, scene_index)
+    calibrated_sensor = nusc.calibrated_sensor
+
+    
+    list_info = []
+    for idx, frame in enumerate(frames):
+
+        #get sensor tokens for each frame
+        sensors_token = []
+        sensors_token.append(frame["data"]["RADAR_FRONT"])
+        sensors_token.append(frame["data"]["RADAR_FRONT_LEFT"])
+        sensors_token.append(frame["data"]["RADAR_FRONT_RIGHT"])
+        sensors_token.append(frame["data"]["RADAR_BACK_LEFT"])
+        sensors_token.append(frame["data"]["RADAR_BACK_RIGHT"])
+        sensors_token.append(frame["data"]["LIDAR_TOP"])
+        sensors_token.append(frame["data"]["CAM_FRONT"])
+        sensors_token.append(frame["data"]["CAM_FRONT_RIGHT"])
+        sensors_token.append(frame["data"]["CAM_BACK_RIGHT"])
+        sensors_token.append(frame["data"]["CAM_BACK"])
+        sensors_token.append(frame["data"]["CAM_BACK_LEFT"])
+        sensors_token.append(frame["data"]["CAM_FRONT_LEFT"])
+        
+        calibrated_info = []
+        #find calibrated information for our sensors (unfortunatly it returns an empty list -> try to fix it)
+        calibrated_info = [value for value in calibrated_sensor if value["sensor_token"] in sensors_token] 
+
+        list_info.append({"frame_id" : idx, 
+                "frame_token" : frame["token"], 
+                "calibrated_sensors" : calibrated_info})
+
+
+    return list_info
+
 
 def extract_scene_data_as_json(nusc, scene_idx, path=None):
     """
