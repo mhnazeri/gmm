@@ -98,6 +98,30 @@ def create_feature_matrix_for_viz(file):
     return datum
 
 
+def calibrated_info(file): 
+    """
+    Read calibrated sensors data from json file
+
+    :param file: path which json file is saved
+    :returns list_info: list of traslations and rotations
+    """
+    with open(file, "r") as f:
+        calibrated = json.load(f)
+    
+    list_info = []
+
+    for data in calibrated:
+        list_info.append({
+            "sensor": data["sensor_token"],
+            "translation": data["translation"],
+            "rotation": data["rotation"]   
+        })
+
+    return list_info
+
+    
+
+
 if __name__ == "__main__":
     data = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
     print(data.shape)
