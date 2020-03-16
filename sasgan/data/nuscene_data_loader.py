@@ -6,7 +6,7 @@ TODO:
 """
 import os
 import logging
-import orjson as json
+import ujson as json
 import numpy as np
 from functools import lru_cache
 from mpl_toolkits.mplot3d import Axes3D
@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
-from sasgan.data.traj_viz import render_scene_lidar
+# from sasgan.data.traj_viz import render_scene_lidar
 import imageio
 
 
@@ -123,6 +123,8 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
             "ego_pose_velocity": ego_velocity(
                 nusc, sample["data"]["LIDAR_TOP"]
             ).tolist(),
+            "calibrated_translation": extract("calibrated_sensor", sample_data["calibrated_sensor_token"])["translation"],
+            "calibrated_rotation": extract("calibrated_sensor", sample_data["calibrated_sensor_token"])["rotation"],
             "timestamp": sample_data["timestamp"],
             "lidar": sample_data["filename"],
             "camera": camera_front["filename"],
@@ -217,17 +219,19 @@ def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.nda
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    backgraound_motion_detector(root)
+    # backgraound_motion_detector(root)
     # render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
-    # for idx in range(len(nusc.scene)):
-    #     extract_scene_data_as_json(nusc, idx, "exported_json_data")
+    for idx in range(len(nusc.scene)):
+        extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
     # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")
     # sample_ann = nusc.get("sample_annotation", sample["anns"][0])
     # # print(sample_ann)
     # sample_data = nusc.get("sample", sample_ann["sample_token"])
+    # # print(sample_data)
     # lidar = nusc.get("sample_data", sample_data["data"]["LIDAR_TOP"])
-    # print(nusc.get("ego_pose", lidar["ego_pose_token"]))
+    # # print(lidar)
+    # # print(nusc.get("ego_pose", lidar["ego_pose_token"]))
 
     # print(nusc.get("calibrated_sensor", lidar["calibrated_sensor_token"]))
     # print(nusc.get("calibrated_sensor", sample_data["calibrated_sensor_token"]))

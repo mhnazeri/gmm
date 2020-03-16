@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
-from data.data_helpers import create_feature_matrix
+from data_helpers import create_feature_matrix
 # from nuscenes.utils.data_classes import LidarPointCloud
 
 
@@ -27,7 +27,7 @@ class NuSceneDataset(Dataset):
         features = []
         self.data = []
         # read the list 14 element at a time
-        num_features = list(range(560))
+        num_features = list(range(561))
         start_stop = list(zip(num_features[::14], num_features[14::14]))
 
         for file in files:
@@ -59,10 +59,18 @@ class NuSceneDataset(Dataset):
 
                 image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
                 rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
-                rel_past.insert(0, torch.zeros_like(past[0]))
+
+                # if frame is at the beginning of a scene
+                if stamp == 0:
+                    rel_past.insert(0, torch.zeros_like(past[0]))
+                    image.insert(0, torch.zeros_like(image[0]))
+                else:
+                    rel_past.insert(0, past[0] - self.data[-1]["past"][-1])
+                    image.insert(0, image[0] - self.data[-1]["motion"][-1])
+
                 data["past"] = past
                 data["future"] = future
-                image.insert(0, torch.zeros_like(image[0]))
+
                 data["rel_past"] = rel_past
                 data["motion"] = image
 
@@ -203,11 +211,11 @@ if __name__ == '__main__':
     # print(len(data.__getitem__(0)))
     # data = CAEDataset("/home/nao/Projects/sasgan/sasgan/data/", "exported_json_data/scene-0061.json")
     # data = DataLoader(data, batch_size=1, shuffle=True, num_workers=2, drop_last=True)
-    d = data.__getitem__(1)
+    d = data.__getitem__(26)
     print(len(data))
     # print(d)
     # print(d["past"])
-    print(type(d["rel_past"]))
-    print(len(d["rel_past"]))
-    print(type(d["rel_past"][0]))
-    print(d["rel_past"][0].shape)
+    print(type(d["motion"]))
+    print(len(d["motion"]))
+    print(type(d["motion"][0]))
+    print(d["motion"][0].shape)
