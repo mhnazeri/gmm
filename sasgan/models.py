@@ -106,9 +106,8 @@ class ContextualFeatures(nn.Module):
             self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
                                  kernel_size=1, stride=1)
 
-
-    def forward(self, frame_1: np.ndarray, frame_2: np.ndarray):
-        # frame = self.background_motion(frame_1, frame_2)
+    def forward(self, frame: np.ndarray):
+        batch = frame.size(0)
         frame = self.layer_1(frame)
         frame = self.layer_2(frame)
         frame = self.layer_3(frame)
@@ -122,41 +121,33 @@ class ContextualFeatures(nn.Module):
         frame = frame_hx.matmul(frame)
         return self.frame_vx(frame).view(-1, 1024, 12, 12)
 
-    # def background_motion(self, frame_1: np.ndarray, frame_2:np.ndarray) -> np.ndarray:
-    #     """returns background motion between two consequtive frames"""
-    #     return frame_2 - frame_1
-
 ##################################################################################
 #                               Fusion modules
 # ________________________________________________________________________________
 class Fusion(nn.Module):
     """Feature Pool and Fusion module"""
-    def __init__(self, pool_dim=256, hidden_size=128, batch_size=1):
+    def __init__(self, pool_dim=256, hidden_size=128):
         super(Fusion, self).__init__()
         self.hidden_size = hidden_size
-        self.batch_size = batch_size
         self.pool_dim = pool_dim
         # can be removed
         self.linear = nn.Sequential(nn.Linear(147_456, pool_dim),
                                     nn.MaxPool(kernel_size=2, stride=2),
                                     nn.ReLU())
-        self.fuse = nn.LSTM(input_size=295, hidden_size=256, batch_first=True)
+        self.fuse = nn.LSTM(input_size=167, hidden_size=256)
 
-    def initiate_hidden(self):
+    def initiate_hidden(self, batch, sequence_len):
         return (
-            torch.zeros(1, self.batch_size, self.hidden_size),
-            torch.zeros(1, self.batch_size, self.hidden_size)
+            torch.zeros(sequence_len, batch, self.hidden_size),
+            torch.zeros(sequence_len, batch, self.hidden_size)
         )
 
     def get_noise(self, shape, noise_type="gaussian"):
         if noise_type == 'gaussian':
-            return torch.randn(*shape).cuda()
+            return torch.randn(*shape)
         elif noise_type == 'uniform':
-            return torch.rand(*shape).sub_(0.5).mul_(2.0).cuda()
+            return torch.rand(*shape).sub_(0.5).mul_(2.0)
         raise ValueError('Unrecognized noise type "%s"' % noise_type)
-
-    # def rel_distance(agent_1, agent_2):
-    #     return torch.sqrt(((agent_1 - agent_2) ** 2).sum())
 
     def forward(self, real_history, rel_history, pool, context_feature, agent_idx):
         """receives the whole feature matrix as input (max_agents * 56)
@@ -166,23 +157,35 @@ class Fusion(nn.Module):
             real_history: a matrix containing unmodified past locations (100,7)
             pool: modified past locations (100, 32)
             context_feature: tensor of size=(1024, 12, 12)=147456
-            i: desired agent number to forecast future
+            i: desired agent number to forecast future, if -1, it will predict all the agents at the same time
         """
-        agent = pool[agent_idx] # a vector of size 32
-        agent_rel = rel_history[agent_idx][:7] # vector of size 7
+        batch = pool.size(1)
+        sequence_length = pool.size(0)
+        if agent_idx == -1:
+            agent = pool
+            agent_rel = rel_history[:, :7]
+            context_feature = context_feature.view(-1) # 147456 digits
+            context_feature = context_feature.repeat(agent.size(0), 1)
+            noise = self.get_noise((agent.size(0), 5))
+        else:
+            agent = pool[agent_idx] # a vector of size 32
+            agent_rel = rel_history[agent_idx][:7] # vector of size 7
+            real_history = real_history[agent_idx]
+            noise = self.get_noise((5,))
 
         # agent = self.linear(agent)
         agent = torch.cat((agent_rel, agent), 1) # vector of 7 + 32 = 39
-        context_feature = context_feature.view(self.batch_size, -1) # 147456 digits
         context_feature = self.linear(context_feature) # vector of size 128
-        cat_features = torch.cat((context_feature, agent), 1) # 295
-        cat_features = cat_features.view(self.batch_size, -1, 295)
 
-        _, fused_features_hidden, _ = self.fuse(cat_features,
-                                                self.initiate_hidden())
+        cat_features = torch.cat((context_feature, agent), 1) # 167
+        cat_features = cat_features.view(-1, batch, 167)
+
+        fused_features_hidden, _ = self.fuse(cat_features,
+                                                self.initiate_hidden(batch, sequence_length))
+
         # dim: 5 + 3 + 256 = 264
         fused_features_hidden = torch.cat(
-            (self.get_noise((5,)), real_history[agent_idx], fused_features_hidden),
+            (noise, real_history, fused_features_hidden),
             1)
         return fused_features_hidden
 
@@ -193,17 +196,28 @@ class Generator(nn.Module):
     """Trajectory generator"""
     def __init__(self, input_size=264, hidden_size=32, num_layers=1):
         super(Generator, self).__init__()
+        self.hidden_size = hidden_size
         self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                                num_layers=num_layers, batch_first=True)
+                                num_layers=num_layers)
+        self.hidden2pos = nn.Linear(hidden_size, 70)
+        # self.hidden2pos = nn.Linear(h_dim, 3)
 
-    def initiate_hidden(self):
-        return torch.zeros(1, self.batch_size, self.hidden_size)
+    def initiate_hidden(self, traj):
+        return torch.zeros(traj.size(0), traj.size(1), self.hidden_size)
 
-    def forward(self, traj, hidden_state):
-        hidden = (hidden_state, self.initiate_hidden())
-        traj = traj.view(traj.size(0), -1, 264) # traj.size(1)=264
+    def forward(self, traj, real_history, hidden_state):
+        # batch = traj.size(0)
+        hidden = (hidden_state, self.initiate_hidden(traj))
+        # traj = traj.view(batch, traj.size(1), 264) # traj.size(1)=264
         traj, _ = self.decoder(traj, hidden)
-        return traj.view(-1, 70)
+        traj = traj.tolist()
+        traj_pred = []
+        for agent in traj:
+            traj_pred.append(self.hidden2pos(
+                torch.tensor(agent.view(batch, 70))
+                ))
+        # return a vector of size (seq_len, batch, input_size)
+        return torch.cat(traj_pred, dim=0)
 
 
 ##################################################################################

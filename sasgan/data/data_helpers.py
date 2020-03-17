@@ -74,6 +74,7 @@ def create_feature_matrix_for_viz(file):
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
     agents = np.zeros((len(datum[-1]), 120))
+    calibrated_features = []
     # appears = (agent_num, start, stop)
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
@@ -87,15 +88,17 @@ def create_feature_matrix_for_viz(file):
     for id in range(num_frames):
         # ego vehicle location
         ego.extend(datum[id]["ego_pose_translation"])
+        calibrated_features.append((datum[id]["calibrated_translation"],
+                                    datum[id]["calibrated_rotation"]))
     else:
         for i in range(40 - num_frames):
             ego.extend([0., 0., 0.])
 
-    ego = torch.tensor(ego).reshape(-1, 120)
-    agents = torch.from_numpy(agents).float()
-    datum = torch.cat((ego, agents), 0)
+    ego = np.array(ego).reshape(-1, 120)
+    agents = agents
+    datum = np.concatenate((ego, agents), 0)
 
-    return datum
+    return datum, calibrated_features
 
 
 if __name__ == "__main__":

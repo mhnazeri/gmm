@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from nuscenes.nuscenes import NuScenes, view_points
 from nuscenes.utils.data_classes import LidarPointCloud
+from nuscenes.eval.common.utils import boxes_to_sensor
 from data_helpers import create_feature_matrix_for_viz
 
 
@@ -54,12 +55,27 @@ def update(*frames):
     #     agent_future = feature_matrix[i][(idx_frame + 2) * 3: (idx_frame + 5) * 3]
     #     axes.scatter(agent_past[::3], agent_past[1::3], marker='d', label="Past")
     #     axes.scatter(agent_future[::3], agent_future[1::3], marker='s', label="Future")
-    for lidar, feature_matrix in frames:
-        for i in range(len(feature_matrix)):
-            agent_past = feature_matrix[i][: 6] - feature_matrix[0][: 6]
-            agent_future = feature_matrix[i][6:] - feature_matrix[0][6:]
+    for lidar, data, calibre in frames:
+        pose_record = {"translation": data["now"][0], "rotation": data["now"][0]}
+        for i in range(1, len(lidar)):
+            # print(feature_matrix.shape)
+            # Move box to ego vehicle coord system
+            agent_past = data["past"][0] - data["past"][i]
+            agent_future = data["future"][0] - data["future"][i]
+            # print(agent_past.shape)
+
+            # agent_past -= pose_record["translation"]
+            # agent_future -= pose_record["translation"]
+            # Move box to sensor coord system
+            agent_past -= np.tile(np.array(calibre[0]), 2)
+            agent_future -= np.tile(np.array(calibre[0]), 3)
+
             axes.scatter(agent_past[::3], agent_past[1::3], marker='d', label="Past")
             axes.scatter(agent_future[::3], agent_future[1::3], marker='s', label="Future")
+
+            axes_limit = 53
+            axes.set_xlim(-axes_limit, axes_limit)
+            axes.set_ylim(-axes_limit, axes_limit)
 
         for ann in lidar["anns"]:
             data_path, boxes, _ = nusc.get_sample_data(lidar["data"]["LIDAR_TOP"], selected_anntokens=[ann])
@@ -67,6 +83,7 @@ def update(*frames):
             for box in boxes:
                 c = np.array(_get_color(box.name)) / 255.0
                 box.render(axes, view=view, colors=(c, c, c))
+
                 corners = _view_points(boxes[0].corners(), view)[:2, :]
                 axes.set_xlim([np.min(corners[0, :]) - 10, np.max(corners[0, :]) + 10])
                 axes.set_ylim([np.min(corners[1, :]) - 10, np.max(corners[1, :]) + 10])
@@ -77,11 +94,11 @@ def update(*frames):
     frame = LidarPointCloud.from_file(data_path)
     frame.render_height(axes, view=np.eye(4))
 
-    global data
-    data = _view_points(frame.points[:3,:], np.eye(4))
+    global data_
+    data_ = _view_points(frame.points[:3,:], np.eye(4))
 
-    xdata = data[0, :]
-    ydata = data[1, :]
+    xdata = data_[0, :]
+    ydata = data_[1, :]
     ln.set_data(xdata, ydata)
     return ln,
 
@@ -134,10 +151,23 @@ def _get_color(category_name: str):
 
 def render_scene_lidar(root, nusc, idx_scene=0, save_path=None, blit=False):
     scene_data = sample_extractor(nusc, idx_scene)
-    feature_matrix = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
+    feature_matrix, calibrated_features = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
     lidar = []
-    for idx, sample_frame in enumerate(scene_data):
-        lidar.append((sample_frame, feature_matrix[:, (idx * 3) - 6: (idx * 3) + 15]))
+    num_features = list(range(121))
+    start_stop = list(zip(num_features[::3], num_features[3::3]))
+
+    for idx in range(2, 37):
+        data = {}
+        data["past"] = feature_matrix[:, start_stop[idx-2][0]: start_stop[idx-2][1]]
+        data["past"] = np.concatenate((data["past"], feature_matrix[:, start_stop[idx-1][0]: start_stop[idx-1][1]]), 1)
+        data["now"] = feature_matrix[:, start_stop[idx][0]: start_stop[idx][1]]
+        data["future"] = feature_matrix[:, start_stop[idx+1][0]: start_stop[idx+1][1]]
+        data["future"] = np.concatenate((data["future"], feature_matrix[:, start_stop[idx+2][0]: start_stop[idx+2][1]]), 1)
+        data["future"] = np.concatenate((data["future"], feature_matrix[:, start_stop[idx+3][0]: start_stop[idx+3][1]]), 1)
+        lidar.append((scene_data[idx],
+            data,
+            calibrated_features[idx])
+        )
 
     # feature_matrix = zip(feature_matrix[:][: 6: 6],
     #                      feature_matrix[:][6: 21: 15])
