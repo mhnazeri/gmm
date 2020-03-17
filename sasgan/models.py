@@ -1,5 +1,5 @@
 """ This file contains the implementation of the main models including:
-    1. Encoder(Boh)
+    1. Encoder
     2. Contextual Feature Extractor
 """
 import torch
