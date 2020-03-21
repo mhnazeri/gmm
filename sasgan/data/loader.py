@@ -27,8 +27,9 @@ class NuSceneDataset(Dataset):
         features = []
         self.data = []
         # read the list 14 element at a time
-        num_features = list(range(561))
-        start_stop = list(zip(num_features[::14], num_features[14::14]))
+        num_features = [x for x in range(561) if x % 14 == 0]
+        # start_stop = list(zip(num_features[::14], num_features[14::14]))
+        start_stop = list(zip(num_features[:], num_features[1:]))
 
         for file in files:
             lidar_address, camera_address = self.read_file(file)

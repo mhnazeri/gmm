@@ -131,9 +131,13 @@ class Fusion(nn.Module):
         self.hidden_size = hidden_size
         self.pool_dim = pool_dim
         # can be removed
-        self.linear = nn.Sequential(nn.Linear(147_456, pool_dim),
+        self.linear = nn.Sequential(nn.Linear(147_456, 147_456 / 2),
+                                    nn.MaxPool(kernel_size=2, stride=2),
+                                    nn.ReLU(),
+                                    nn.Linear(147_456 / 2, pool_dim),
                                     nn.MaxPool(kernel_size=2, stride=2),
                                     nn.ReLU())
+
         self.fuse = nn.LSTM(input_size=167, hidden_size=256)
 
     def initiate_hidden(self, batch, sequence_len):
