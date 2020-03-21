@@ -141,6 +141,10 @@ def make_cae(
     plt.xlabel("# Epochs", size=7), plt.yticks(np.linspace(np.min(losses), np.max(losses), int(epochs/4)) / 10000, size=5)
     plt.xticks(list(range(0, epochs, int(epochs/10))), size=5), plt.ylabel("Binary Cross Entropy with Logits Loss / 1000", size=7)
 
+    # Freeze the parameters on encoder and decoder
+    encoder.eval()
+    decoder.eval()
+    return encoder, decoder
 
 if __name__ == "__main__":
     cae_config = config("CAE")

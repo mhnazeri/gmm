@@ -1,5 +1,5 @@
 """ This file contains the implementation of the main models including:
-    1. Encoder(Boh)
+    1. Encoder
     2. Contextual Feature Extractor
 """
 import torch
@@ -25,19 +25,17 @@ tensorboard_logger = Logger()
 #                                    Encoder
 # ________________________________________________________________________________
 class Encoder(nn.Module):
-    def __init__(self, input_size: int = 7, embedding_dimension: int = 64, hidden_size: int = 32, num_layers:int = 1):
+    def __init__(self, input_size: int = 7, hidden_size: int = 32, num_layers:int = 1, batch_size:int=64):
         """
         :param input_size: The size of each vector representing an agent in a frame containing all the features
-        :param embedding_dimension: The size in which the input features will be embedded to
         :param hidden_size: The size of the hidden dimension of LSTM layer. As bigger the hidden dimension as higher the
             capability of the encoder to model longer sequences
         :param num_layers: The depth of the LSTM networks, Set to one in SGAN original code
         """
         super(Encoder, self).__init__()
-        self.num_layers = 32
+        self.num_layers = num_layers
         self.hidden_size = hidden_size
-        # self.embedder = nn.Linear(input_size, embedding_dimension)
-        # self.embedding_dimension = embedding_dimension
+        self.batch_size = batch_size
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
     def initiate_hidden(self, batch_size):
@@ -57,9 +55,9 @@ class Encoder(nn.Module):
 
         # batch_size = inputs.size(1)
         # embed = self.embedder(inputs.view(-1, 2))
-        inputs = inputs.view(batch_size, 100, -1)
+        inputs = inputs.view(self.batch_size, 100, -1)
 
-        states = self.initiate_hidden(batch_size)
+        states = self.initiate_hidden(self.batch_size)
         _, hidden_state, _ = self.lstm(inputs, states)
 
         return hidden_state
@@ -250,6 +248,7 @@ class TrajectoryDiscriminator(nn.Module):
         encoded_traj = self.fusion(real_history, traj, image, agent_idx)
         score = self.mlp(encoded_traj)
         return score
+
 
 ##################################################################################
 #                              Testing the modules
