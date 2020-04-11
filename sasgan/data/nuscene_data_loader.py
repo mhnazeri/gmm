@@ -8,15 +8,10 @@ import os
 import logging
 import ujson as json
 import numpy as np
-from functools import lru_cache
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib
 import matplotlib.pyplot as plt
-import torch
-from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
-# from sasgan.data.traj_viz import render_scene_lidar
 import imageio
+# from sasgan.data.traj_viz import render_scene_lidar
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +38,6 @@ def sample_extractor(nusc, idx_scene):
     return _frames
 
 
-@lru_cache(64)
 def _sample_annotations(nusc, instance):
     sample_annotation = nusc.get("sample_annotation", instance)
     annotation = []

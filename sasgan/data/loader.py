@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
-from data_helpers import create_feature_matrix
+from data.data_helpers import create_feature_matrix
 # from nuscenes.utils.data_classes import LidarPointCloud
 
 

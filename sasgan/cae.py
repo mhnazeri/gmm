@@ -2,8 +2,6 @@
 Implementation of Contractive Autoencoder to compress feature vector into
 latent feature vector
 """
-import sys
-import os
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
@@ -111,6 +109,8 @@ def make_cae(
             # change (batch, 100, n_inputs) to (100, n_inputs) if use NuSceneDataloader
             # samples = samples[0].view(-1, n_inputs)
             samples = samples.view(-1, n_inputs)
+            if samples.sum() == 0:
+                continue
 
             # remove zero rows
             # valid_rows = []

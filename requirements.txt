@@ -53,7 +53,6 @@ notebook==6.0.3
 numpy==1.18.1
 nuscenes-devkit==1.0.6
 opencv-python==4.2.0.32
-orjson==2.5.0
 packaging==20.1
 pandas==1.0.1
 pandocfilters==1.4.2
@@ -100,8 +99,6 @@ terminado==0.8.3
 testpath==0.4.4
 tk==0.1.0
 toml==0.10.0
-torch==1.4.0+cpu
-torchvision==0.5.0+cpu
 tornado==6.0.3
 tqdm==4.42.1
 traitlets==4.3.3

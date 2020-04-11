@@ -136,7 +136,12 @@ class Fusion(nn.Module):
                                     nn.MaxPool(kernel_size=2, stride=2),
                                     nn.ReLU())
 
-        self.fuse = nn.LSTM(input_size=167, hidden_size=256)
+        self.fuse_traj = nn.LSTM(input_size=39, hidden_size=128)
+        self.fuse_context = nn.LSTM(input_size=128, hidden_size=128)
+
+        self.fuse = nn.Sequential(nn.Linear(256, 256),
+                                    nn.MaxPool(kernel_size=2, stride=2),
+                                    nn.ReLU())
 
     def initiate_hidden(self, batch, sequence_len):
         return (
@@ -179,15 +184,21 @@ class Fusion(nn.Module):
         agent = torch.cat((agent_rel, agent), 1) # vector of 7 + 32 = 39
         context_feature = self.linear(context_feature) # vector of size 128
 
-        cat_features = torch.cat((context_feature, agent), 1) # 167
-        cat_features = cat_features.view(-1, batch, 167)
+        # cat_features = torch.cat((context_feature, agent), 1) # 167
+        agent = agent.view(-1, batch, 39)
+        context_feature = context_feature.view(-1, batch, 128)
 
-        fused_features_hidden, _ = self.fuse(cat_features,
+        _, traj_hidden, _ = self.fuse_traj(agent,
                                                 self.initiate_hidden(batch, sequence_length))
 
+        _, context_hidden, _ = self.fuse_traj(context_feature,
+                                                self.initiate_hidden(batch, sequence_length))
+
+        fused_features = torch.cat((traj_hidden, context_hidden), 1)
+        fused_features = self.fuse(fused_features)
         # dim: 5 + 3 + 256 = 264
         fused_features_hidden = torch.cat(
-            (noise, real_history, fused_features_hidden),
+            (noise, real_history, fused_features),
             1)
         return fused_features_hidden
 
