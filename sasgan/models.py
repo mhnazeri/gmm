@@ -117,7 +117,7 @@ class ContextualFeatures(nn.Module):
         frame_hx = self.frame_hx(frame)
         frame = nn.Softmax2d(frame_fx.transpose_(2, 1).matmul(frame_gx), dim=1)
         frame = frame_hx.matmul(frame)
-        return self.frame_vx(frame).view(-1, 1024, 12, 12)
+        return self.frame_vx(frame).view(-1, 1024, 12 * 12)
 
 ##################################################################################
 #                               Fusion modules
@@ -137,7 +137,7 @@ class Fusion(nn.Module):
                                     nn.ReLU())
 
         self.fuse_traj = nn.LSTM(input_size=39, hidden_size=128)
-        self.fuse_context = nn.LSTM(input_size=128, hidden_size=128)
+        self.fuse_context = nn.LSTM(input_size=144, hidden_size=128)
 
         self.fuse = nn.Sequential(nn.Linear(256, 256),
                                     nn.MaxPool(kernel_size=2, stride=2),
@@ -171,8 +171,8 @@ class Fusion(nn.Module):
         if agent_idx == -1:
             agent = pool
             agent_rel = rel_history[:, :7]
-            context_feature = context_feature.view(-1) # 147456 digits
-            context_feature = context_feature.repeat(agent.size(0), 1)
+            # context_feature = context_feature.view(-1) # 147456 digits
+            # context_feature = context_feature.repeat(agent.size(0), 1)
             noise = self.get_noise((agent.size(0), 5))
         else:
             agent = pool[agent_idx] # a vector of size 32
@@ -182,17 +182,17 @@ class Fusion(nn.Module):
 
         # agent = self.linear(agent)
         agent = torch.cat((agent_rel, agent), 1) # vector of 7 + 32 = 39
-        context_feature = self.linear(context_feature) # vector of size 128
+        # context_feature = self.linear(context_feature) # vector of size 128
 
         # cat_features = torch.cat((context_feature, agent), 1) # 167
         agent = agent.view(-1, batch, 39)
-        context_feature = context_feature.view(-1, batch, 128)
+        context_feature = torch.transpose(context_feature, 1, 0) # (1024, batch, 144)
 
         _, traj_hidden, _ = self.fuse_traj(agent,
                                                 self.initiate_hidden(batch, sequence_length))
 
         _, context_hidden, _ = self.fuse_traj(context_feature,
-                                                self.initiate_hidden(batch, sequence_length))
+                                                self.initiate_hidden(batch, 1024))
 
         fused_features = torch.cat((traj_hidden, context_hidden), 1)
         fused_features = self.fuse(fused_features)
