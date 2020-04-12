@@ -156,7 +156,7 @@ class Fusion(nn.Module):
             return torch.rand(*shape).sub_(0.5).mul_(2.0)
         raise ValueError('Unrecognized noise type "%s"' % noise_type)
 
-    def forward(self, real_history, rel_history, pool, context_feature, agent_idx):
+    def forward(self, real_history, rel_history, pool, context_feature, agent_idx=-1):
         """receives the whole feature matrix as input (max_agents * 56)
         28 is for 2 seconds input (each second is 2 frame, each frame has 14
         features)
@@ -218,7 +218,7 @@ class Generator(nn.Module):
     def initiate_hidden(self, traj):
         return torch.zeros(traj.size(0), traj.size(1), self.hidden_size)
 
-    def forward(self, traj, real_history, hidden_state):
+    def forward(self, traj, hidden_state):
         # batch = traj.size(0)
         hidden = (hidden_state, self.initiate_hidden(traj))
         # traj = traj.view(batch, traj.size(1), 264) # traj.size(1)=264
