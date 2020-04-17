@@ -63,7 +63,7 @@ def _sample_annotations(nusc, instance):
                 "movable": movable,
                 "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
                 if movable
-                else [0.0, 0.0, 0.0],
+                else torch.zeros(3, dtype=torch.float32),
             }
         )
 

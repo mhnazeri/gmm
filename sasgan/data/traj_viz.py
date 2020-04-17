@@ -60,22 +60,30 @@ def update(*frames):
         for i in range(1, len(lidar)):
             # print(feature_matrix.shape)
             # Move box to ego vehicle coord system
-            agent_past = data["past"][0] - data["past"][i]
-            agent_future = data["future"][0] - data["future"][i]
+            agent_past = data["past"][i] - data["past"][0]
+            agent_future = data["future"][i] - data["future"][0]
+            agent_now = data["now"][i] - data["now"][0]
+
+            agent_past -= np.tile(np.array(agent_now), 2)
+            agent_future -= np.tile(np.array(agent_now), 3)
             # print(agent_past.shape)
 
             # agent_past -= pose_record["translation"]
             # agent_future -= pose_record["translation"]
             # Move box to sensor coord system
-            agent_past -= np.tile(np.array(calibre[0]), 2)
-            agent_future -= np.tile(np.array(calibre[0]), 3)
+            # agent_past -= np.tile(np.array(calibre[0]), 2)
+            # agent_future -= np.tile(np.array(calibre[0]), 3)
+            print(agent_past)
+            # plotting ego
+            axes.scatter(data["past"][0][::3], data["past"][0][1::3], marker='d', label="Past", color="blue")
+            axes.scatter(data["future"][0][::3], data["future"][0][1::3], marker='s', label="Future", color="green")
+            # plotting other agents
+            axes.scatter(agent_past[::3], agent_past[1::3], marker='d', label="Past", color="blue")
+            axes.scatter(agent_future[::3], agent_future[1::3], marker='s', label="Future", color="green")
 
-            axes.scatter(agent_past[::3], agent_past[1::3], marker='d', label="Past")
-            axes.scatter(agent_future[::3], agent_future[1::3], marker='s', label="Future")
-
-            axes_limit = 53
-            axes.set_xlim(-axes_limit, axes_limit)
-            axes.set_ylim(-axes_limit, axes_limit)
+            # axes_limit = 53
+            # axes.set_xlim(-axes_limit, axes_limit)
+            # axes.set_ylim(-axes_limit, axes_limit)
 
         for ann in lidar["anns"]:
             data_path, boxes, _ = nusc.get_sample_data(lidar["data"]["LIDAR_TOP"], selected_anntokens=[ann])
