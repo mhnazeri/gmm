@@ -191,7 +191,7 @@ class Fusion(nn.Module):
         _, traj_hidden, _ = self.fuse_traj(agent,
                                                 self.initiate_hidden(batch, sequence_length))
 
-        _, context_hidden, _ = self.fuse_traj(context_feature,
+        _, context_hidden, _ = self.fuse_context(context_feature,
                                                 self.initiate_hidden(batch, 1024))
 
         fused_features = torch.cat((traj_hidden, context_hidden), 1)
@@ -215,12 +215,12 @@ class Generator(nn.Module):
         self.hidden2pos = nn.Linear(hidden_size, 70)
         # self.hidden2pos = nn.Linear(h_dim, 3)
 
-    def initiate_hidden(self, traj):
-        return torch.zeros(traj.size(0), traj.size(1), self.hidden_size)
+    def initiate_hidden(self, traj_size):
+        return torch.zeros(traj_size[0], traj_size[1], self.hidden_size)
 
     def forward(self, traj, hidden_state):
         # batch = traj.size(0)
-        hidden = (hidden_state, self.initiate_hidden(traj))
+        hidden = (hidden_state, self.initiate_hidden(traj.size()))
         # traj = traj.view(batch, traj.size(1), 264) # traj.size(1)=264
         traj, _ = self.decoder(traj, hidden)
         traj = traj.tolist()
