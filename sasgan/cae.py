@@ -109,8 +109,9 @@ def make_cae(
             # change (batch, 100, n_inputs) to (100, n_inputs) if use NuSceneDataloader
             # samples = samples[0].view(-1, n_inputs)
             samples = samples.view(-1, n_inputs)
-            if samples.sum() == 0:
-                continue
+            samples = samples[[samples[j].sum() > 0 for j in range(samples.shape[0])]]
+
+            samples = (samples - samples.mean()) / samples.std()
 
             # remove zero rows
             # valid_rows = []
@@ -153,10 +154,12 @@ if __name__ == "__main__":
     data = CAEDataset(root)
     data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    latents_list = list(range(1, 8))
+    latents_list = list(range(1, 2))
     for i, latent in enumerate(latents_list):
         plt.subplot(3, 3, i + 1)
         plt.title("latent_dimension: %d"%latent)
         make_cae(data, int(cae_config["input_dim"]), latent,
                  int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
                  int(cae_config["epochs"]) , cae_config["activation"])
+
+        plt.show()
