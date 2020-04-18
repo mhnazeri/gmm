@@ -59,7 +59,7 @@ def create_feature_matrix(file):
 
     else:
         for i in range(40 - num_frames):
-            ego.extend([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
+            ego.extend(torch.zeros(14, dtype=torch.float32))
 
     ego = torch.tensor(ego).reshape(-1, 560)
     agents = torch.from_numpy(agents).float()
@@ -92,7 +92,7 @@ def create_feature_matrix_for_viz(file):
                                     datum[id]["calibrated_rotation"]))
     else:
         for i in range(40 - num_frames):
-            ego.extend([0., 0., 0.])
+            ego.extend(torch.zeros(3, dtype=torch.float32))
 
     ego = np.array(ego).reshape(-1, 120)
     agents = agents
