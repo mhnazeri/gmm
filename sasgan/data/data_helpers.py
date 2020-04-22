@@ -31,21 +31,22 @@ def create_feature_matrix(file):
     datum, timestamps, appears = read_file(file, "timestamp")
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
-    agents = np.zeros((len(datum[-1]), 560))
+    agents = np.zeros((len(datum[-1]), 520))
     # appears = (agent_num, start, stop)
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
     num = 0
     for key, start, stop in appears:
         for i in range(stop - start):
-            agent_data = datum[-1][key][i]["translation"]
-            agent_data.extend(datum[-1][key][i]["rotation"])
-            agent_data.extend(datum[-1][key][i]["velocity"])
-            agent_data.extend(datum[-1][key][i]["size"])
-            agent_data.extend([datum[-1][key][i]["movable"]])
-            # print(f"{key}, start: {start}, stop: {stop}")
-            # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
-            agents[num, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data)
+            if datum[-1][key][i]["movable"] != 0:
+                agent_data = datum[-1][key][i]["translation"]
+                agent_data.extend(datum[-1][key][i]["rotation"])
+                agent_data.extend(datum[-1][key][i]["velocity"])
+                agent_data.extend(datum[-1][key][i]["size"])
+                # agent_data.extend([datum[-1][key][i]["movable"]])
+                # print(f"{key}, start: {start}, stop: {stop}")
+                # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
+                agents[num, (start * 13) + (i * 13): (start + 1) * 13 + (i * 13)] = np.array(agent_data)
         num += 1
 
     for id in range(num_frames):
@@ -55,13 +56,13 @@ def create_feature_matrix(file):
         ego.extend(datum[id]["ego_pose_rotation"])
         ego.extend(datum[id]["ego_pose_velocity"])
         ego.extend([1.907, 4.727, 1.957])  # size of ego-vehicle
-        ego.extend([1])  # movable
+        # ego.extend([1])  # movable
 
     else:
         for i in range(40 - num_frames):
-            ego.extend(torch.zeros(14, dtype=torch.float32))
+            ego.extend(torch.zeros(13, dtype=torch.float32))
 
-    ego = torch.tensor(ego).reshape(-1, 560)
+    ego = torch.tensor(ego).reshape(-1, 520)
     agents = torch.from_numpy(agents).float()
     datum = torch.cat((ego, agents), 0)
     # datum = torch.transpose(datum, 1, 0)

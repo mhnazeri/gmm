@@ -18,7 +18,7 @@ tensorboard_logger = Logger("./logs")
 class Encoder(nn.Module):
     """Encoder network of CAE"""
 
-    def __init__(self, n_inputs=14, n_hidden=28, n_latent=7, activation="sigmoid"):
+    def __init__(self, n_inputs=13, n_hidden=28, n_latent=7, activation="sigmoid"):
         super(Encoder, self).__init__()
         self.n_inputs = n_inputs
         self.n_latent = n_latent
@@ -41,7 +41,7 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """Decoder network of CAE"""
 
-    def __init__(self, n_inputs=14, n_hidden=28, n_latent=1, activation="sigmoid"):
+    def __init__(self, n_inputs=13, n_hidden=28, n_latent=1, activation="sigmoid"):
         super(Decoder, self).__init__()
         self.n_latent = n_latent
         self.n_inputs = n_inputs
@@ -86,7 +86,7 @@ def loss_function(output_encoder, outputs, inputs, lamda=1e-4):
 
 def make_cae(
     dataloader_train,
-    n_inputs=14,
+    n_inputs=13,
     n_latent=1,
     n_hidden=28,
     batch=40,

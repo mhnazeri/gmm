@@ -271,7 +271,7 @@ dataset_dir = "data/nuScene-mini"
 num_layers = 10
 
 # This is the feature vector size ---> sure
-input_size = 14
+input_size = 13
 
 # Number of the frames of the observed trajectories ----> sure
 sequence_length = 80
