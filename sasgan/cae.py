@@ -138,7 +138,7 @@ def make_cae(
         print(f"epoch/epochs: {e}/{epochs} loss: {loss.item():.4f}")
         torch.save(encoder.state_dict(), f"./models_state/model_cae_{e}.pt")
 
-    plt.plot(range(epochs), np.asarray(losses) / 10000, "r-")
+    plt.plot(range(epochs), np.asarray(losses) / 10000, label=str(n_latent))
     plt.xlabel("# Epochs", size=7), plt.yticks(np.linspace(np.min(losses), np.max(losses), int(epochs/4)) / 10000, size=5)
     plt.xticks(list(range(0, epochs, int(epochs/10))), size=5), plt.ylabel("Binary Cross Entropy with Logits Loss / 1000", size=7)
 
@@ -154,12 +154,10 @@ if __name__ == "__main__":
     data = CAEDataset(root)
     data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    latents_list = list(range(1, 2))
+    latents_list = list(range(1, 8  ))
     for i, latent in enumerate(latents_list):
-        plt.subplot(3, 3, i + 1)
-        plt.title("latent_dimension: %d"%latent)
         make_cae(data, int(cae_config["input_dim"]), latent,
                  int(cae_config["hidden_dim"]), int(cae_config["batch_size"]),
                  int(cae_config["epochs"]) , cae_config["activation"])
-
-        plt.show()
+        plt.legend()
+    plt.show()
