@@ -241,22 +241,26 @@ class TrajectoryDiscriminator(nn.Module):
     """GAN Discriminator"""
     def __init__(self, dropout=0):
         super(TrajectoryDiscriminator, self).__init__()
-        self.encoder = Encoder(input_size=14, embedding_dimension=64, hidden_size=16, num_layers=1)
-        self.contextual_features = ContextualFeatures()
-        self.fusion = Fusion(pool_dim=64, hidden_size=128, batch_size=1)
+        self.encoder = Encoder(input_size=98, hidden_size=64, num_layers=1)
+        # self.contextual_features = ContextualFeatures()
+        # self.fusion = Fusion(pool_dim=64, hidden_size=128, batch_size=1)
         self.mpl = nn.Sequential(
-            nn.Linear(264, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(64, 64),
+            nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Dropout(p=dropout),
-            nn.Linear(1024, 1),
+            nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
+            nn.ReLU()
+            nn.Dropout(p=dropout),
+            nn.Linear(32, 1),
             nn.ReLU()
             )
 
-    def forward(self, traj, image, real_history, agent_idx):
+    def forward(self, traj):
         traj = self.encoder(traj)
-        image = self.contextual_features(image)
-        encoded_traj = self.fusion(real_history, traj, image, agent_idx)
+        # image = self.contextual_features(image)
+        # encoded_traj = self.fusion(real_history, traj, image, agent_idx)
         score = self.mlp(encoded_traj)
         return score
 
