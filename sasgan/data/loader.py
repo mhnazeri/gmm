@@ -27,7 +27,7 @@ class NuSceneDataset(Dataset):
         features = []
         self.data = []
         # read the list 14 element at a time
-        num_features = [x for x in range(561) if x % 14 == 0]
+        num_features = [x for x in range(521) if x % 13 == 0]
         # start_stop = list(zip(num_features[::14], num_features[14::14]))
         start_stop = list(zip(num_features[:], num_features[1:]))
 
@@ -39,12 +39,13 @@ class NuSceneDataset(Dataset):
             #         )
 
             features = create_feature_matrix(file)
-            dummy = torch.zeros(max_agent - len(features), 560)
+            # create zero rows to reach the max agent number
+            dummy = torch.zeros(max_agent - len(features), 520)
             features = torch.cat((features, dummy), 0)
             data = {}
             stamp = 0
 
-            while stamp < 26:
+            while stamp < 27:
                 past = []
                 future = []
                 image = []
@@ -150,7 +151,7 @@ class CAEDataset(Dataset):
         self.features = torch.cat(self.features, dim=0)
 
         num_features = list(range(self.features.shape[1]))
-        self.start_stop = list(zip(num_features[::14], num_features[14::14]))
+        self.start_stop = list(zip(num_features[::13], num_features[13::13]))
 
     def __len__(self):
         return len(self.features)
