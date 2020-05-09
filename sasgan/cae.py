@@ -7,64 +7,60 @@ import torch.nn as nn
 from torch import load, save, tensor
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import torch
 from data.loader import CAEDataset
-from utils import config, checkpoint_path
+from utils import *
 import seaborn as sns
 import logging
 from losses import cae_loss
 import os
 from numpy import inf, mean
-
+import numpy as np
 
 logger = logging.getLogger(__name__)
 sns.set(color_codes=True)
 
-class Encoder(nn.Module):
+class Encoder_Decoder(nn.Module):
     """Encoder network of CAE"""
 
-    def __init__(self, n_inputs=13, n_hidden=28, n_latent=7, activation="sigmoid"):
-        super(Encoder, self).__init__()
-        self.n_inputs = n_inputs
-        self.n_latent = n_latent
-        self.fc_1 = nn.Linear(self.n_inputs, n_hidden)
-        self.fc_2 = nn.Linear(n_hidden, n_latent)
+    def __init__(self,
+                 Encoder :bool = True,
+                 input_size: int = 13,
+                 structure: list = [128],
+                 latent_dimension: int = 7,
+                 dropout: float = 0.0,
+                 batch_normalization: bool = False,
+                 activation="Sigmoid"):
 
-        if activation == "sigmoid":
-            self.activation = nn.Sigmoid()
-        elif activation == "tanh":
-            self.activation = nn.Tanh()
+        super(Encoder_Decoder, self).__init__()
+        self.n_inputs = input_size
+        self.n_latent = latent_dimension
+
+        if Encoder:
+            structure.insert(0, input_size)
+            structure.append(latent_dimension)
+
+        else:
+            structure.insert(0, latent_dimension)
+            structure.append(input_size)
+
+        if activation == "Sigmoid" \
+                or activation == "Tanh" \
+                or activation == "Relu":
+            pass
+
         else:
             raise "{} function is not supported".format(self.activation)
 
-    def forward(self, x):
-        x = x.view(-1, self.n_inputs)
-        x = self.activation(self.fc_1(x))
-        return self.fc_2(x)
-
-
-class Decoder(nn.Module):
-    """Decoder network of CAE"""
-
-    def __init__(self, n_inputs=13, n_hidden=28, n_latent=1, activation="sigmoid"):
-        super(Decoder, self).__init__()
-        self.n_latent = n_latent
-        self.n_inputs = n_inputs
-
-        # encoder network, two layer mlp
-        self.fc_1 = nn.Linear(n_latent, n_hidden)
-        self.fc_2 = nn.Linear(n_hidden, n_inputs)
-
-        if activation == "sigmoid":
-            self.activation = nn.Sigmoid()
-        elif activation == "tanh":
-            self.activation = nn.Tanh()
-        else:
-            raise "{} function is not supported".format(self.activation)
+        self.mlp = make_mlp(
+            layers=structure,
+            activation=activation,
+            dropout=dropout,
+            batch_normalization=batch_normalization
+        )
 
     def forward(self, x):
-        x = x.view(-1, self.n_latent)
-        x = self.activation(self.fc_1(x))
-        return self.fc_2(x)
+        return self.mlp(x)
 
 
 def make_cae(dataloader_train, summary_writer):
@@ -75,15 +71,18 @@ def make_cae(dataloader_train, summary_writer):
     The model will train even though there is any saved model until there are iteratioins specified, In order to just
         retrieve a saved model, you should set the epochs to zero in the config file
 
-    :param dataloader_train: the training data
+    :param dataloader_train: the training data iterator on Tensors with shape (batch_size, 520)
     :return: The trained encoder and decoder model with frozen weights
     """
     save_dir = os.path.join(config("Directories")["save_model"], "cae")
 
     # Load the required parameters
     CAE = config("CAE")
-    n_inputs = int(CAE["input_dim"])
-    n_hidden = int(CAE["hidden_dim"])
+    encoder_structure = convert_str_to_list(CAE["encoder_structure"])
+    decoder_structure = convert_str_to_list(CAE["decoder_structure"])
+    dropout = float(CAE["dropout"])
+    bn = bool(CAE["batch_normalization"])
+    n_inputs = int(CAE["input_size"])
     n_latent = int(CAE["latent_dimension"])
     iterations = int(CAE["epochs"])
     activation = str(CAE["activation"])
@@ -91,9 +90,23 @@ def make_cae(dataloader_train, summary_writer):
     save_every_d_epochs = int(CAE["save_every_d_epochs"])
     ignore_first_epochs = int(CAE["ignore_first_epochs"])
 
+
     """create the whole cae"""
-    encoder = Encoder(n_inputs, n_hidden, n_latent, activation)
-    decoder = Decoder(n_inputs, n_hidden, n_latent, activation)
+    encoder = Encoder_Decoder(Encoder=True,
+                              input_size=n_inputs,
+                              structure=encoder_structure,
+                              latent_dimension=n_latent,
+                              dropout=dropout,
+                              activation=activation,
+                              batch_normalization=bn)
+
+    decoder = Encoder_Decoder(Encoder=False,
+                              input_size=n_inputs,
+                              structure=decoder_structure,
+                              latent_dimension=n_latent,
+                              dropout=dropout,
+                              activation=activation,
+                              batch_normalization=bn)
 
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
@@ -122,16 +135,11 @@ def make_cae(dataloader_train, summary_writer):
         logger.debug("Done")
 
     for epoch in range(start_epoch, start_epoch + iterations):
-        logger.debug("Trining the CAE")
+        logger.debug("Training the CAE")
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
-            # change (batch, 100, n_inputs) to (100, n_inputs) if use NuSceneDataloader
-            # samples = samples[0].view(-1, n_inputs)
-            samples = samples.view(-1, n_inputs)
-            samples = samples[[samples[j].sum() > 0 for j in range(samples.shape[0])]]
-
-            samples = (samples - samples.mean()) / samples.std()
+            # samples = (samples - samples.mean()) / samples.std()
 
             # What are these for Mohammad??
             samples.requires_grad = True
@@ -151,10 +159,16 @@ def make_cae(dataloader_train, summary_writer):
 
             summary_writer.add_scalar("cae_loss", loss, step)
 
-        logger.info(f"TRAINING [{(epoch + 1)} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
+            if torch.isnan(loss):
+                print("outputs_encoder", outputs_encoder)
+                print("outputs", outputs)
+                print("samples", samples)
+                break
+
+        logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
 
         """
-        The model will be saved in three circumstances:
+        The model will be saved in three circumstances: 
           1. every d time steps specified on the config file
           2. when the loss was better in the previous iteration compared to best loss ever
           3. after the final iteration

@@ -40,8 +40,8 @@ class NuSceneDataset(Dataset):
 
             features = create_feature_matrix(file)
             # create zero rows to reach the max agent number
-            dummy = torch.zeros(max_agent - len(features), 520)
-            features = torch.cat((features, dummy), 0)
+            # dummy = torch.zeros(max_agent - len(features), 520)
+            # features = torch.cat((features, dummy), 0)
             data = {}
             stamp = 0
 
@@ -142,13 +142,10 @@ class CAEDataset(Dataset):
         json_files = os.path.join(root_dir, "exported_json_data")
         files = os.listdir(json_files)
         files = [os.path.join(json_files, _path) for _path in files]
-        self.features = []
 
-        for file in files:
-            features = create_feature_matrix(file)
-            self.features.append(features)
-
-        self.features = torch.cat(self.features, dim=0)
+        self.features = np.concatenate([create_feature_matrix(file) for file in files], axis=0).reshape((-1, 13))
+        self.features = self.features[np.where(self.features.sum(axis=1) != 0)]
+        self.features = (self.features - self.features.mean()) / self.features.std()
 
         num_features = list(range(self.features.shape[1]))
         self.start_stop = list(zip(num_features[::13], num_features[13::13]))
@@ -162,9 +159,6 @@ class CAEDataset(Dataset):
         :param int idx: train data index
         :return: row idx of train dataset
         """
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
         # start, stop = self.start_stop[idx]
         # self.features[:, start: stop]
         # all agents (rows), specific columns (timestamps)
@@ -178,7 +172,6 @@ class CAEDataset(Dataset):
         # lidar = LidarPointCloud.from_file(lidar_name)
         # frames = self.scene_frames[idx, (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)]
         # sample = {'frames': self.scene_frames, 'image': image, 'lidar': lidar}
-
         return sample
 
     def read_file(self, file: str, feature: str = None):

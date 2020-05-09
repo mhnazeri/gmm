@@ -13,44 +13,25 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # The logger used for debugging
 logger = logging.getLogger(__name__)
 
-def make_mlp(layers: list, activation: str = "Relu", dropout: float = 0.0):
-    """
-    Makes a mlp with the specified inputs
-    :param layers: a list containing the dimensions of the linear layers
-    :param activation: "Relu" or "LeakyRelu"
-    :param dropout: a float between 0.0 and 1.0
-    :return: the nn.module object constructed with nn.Sequential
-    """
-    nn_layers = []
-    for dim_in, dim_out in zip(layers[:-1], layers[1:]):
-        nn_layers.append(nn.Linear(dim_in, dim_out))
-        nn_layers.append(nn.BatchNorm1d(dim_out))
-        if activation == "Relu":
-            nn_layers.append(nn.ReLU())
-        elif activation == "LeakyRelu":
-            nn_layers.append(nn.LeakyReLU())
-        if dropout > 0:
-            nn_layers.append(nn.Dropout(p=dropout))
-
-    return nn.Sequential(*nn_layers)
-
 
 ##################################################################################
 #                                    Encoder
 # ________________________________________________________________________________
-class Encoder(nn.Module):
-    def __init__(self, input_size: int = 7, hidden_size: int = 32, num_layers:int = 1, batch_size:int=64):
+class Generator_Encoder(nn.Module):
+    def __init__(self,
+                 input_size: int = 7,
+                 hidden_size: int = 32,
+                 num_layers: int = 1):
         """
         :param input_size: The size of each vector representing an agent in a frame containing all the features
         :param hidden_size: The size of the hidden dimension of LSTM layer. As bigger the hidden dimension as higher the
             capability of the encoder to model longer sequences
         :param num_layers: The depth of the LSTM networks, Set to one in SGAN original code
         """
-        super(Encoder, self).__init__()
+        super(Generator_Encoder, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
-        self.batch_size = batch_size
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers)
 
     def initiate_hidden(self, batch_size):
         return (
@@ -72,9 +53,9 @@ class Encoder(nn.Module):
         inputs = inputs.view(self.batch_size, 100, -1)
 
         states = self.initiate_hidden(self.batch_size)
-        _, hidden_state, _ = self.lstm(inputs, states)
+        _, states = self.lstm(inputs, states)
 
-        return hidden_state
+        return states[0]
 
 
 ##################################################################################
@@ -221,7 +202,10 @@ class Fusion(nn.Module):
 # ________________________________________________________________________________
 class Generator(nn.Module):
     """Trajectory generator"""
-    def __init__(self, input_size=264, hidden_size=32, num_layers=1):
+    def __init__(self,
+                 input_size:int =264,
+                 hidden_size=32,
+                 num_layers=1):
         super(Generator, self).__init__()
         self.hidden_size = hidden_size
         self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
@@ -250,32 +234,77 @@ class Generator(nn.Module):
 ##################################################################################
 #                               GAN Discriminator
 # ________________________________________________________________________________
+class Discriminator_Encoder(nn.Module):
+    def __init__(self,
+                 input_size: int = 13,
+                 encoding_dimension: int = 64,
+                 hidden_size: int = 64,
+                 num_layers: int = 1,
+                 dropout: float = 0.0):
+        """
+        :param input_size: The dimension of the input data (number of features)
+        :param hidden_size: The hidden size of LSTM module
+        :param num_layers: Number of the layers for LSTM
+        """
+        super(Discriminator_Encoder, self).__init__()
+
+        self.linear = nn.Linear(input_size, encoding_dimension)
+        self.encoder = nn.LSTM(encoding_dimension, hidden_size, num_layers, dropout=dropout)
+
+    def initiate_hidden(self, batch_size):
+        return (
+            torch.zeros(self.num_layers, batch_size, self.hidden_size),
+            torch.zeros(self.num_layers, batch_size, self.hidden_size)
+        )
+
+    def forward(self, trajectories):
+        """
+        :param trajectories: A Tensor of the shape (seq_length, batch, feature_size)
+        :return: A Tensor of the shape (num_layers, batch, hidden_size)
+        """
+        batch_size = trajectories.shape[1]
+        converted_trajectories = self.linear(trajectories)
+        _, states = self.encoder(converted_trajectories, self.initiate_hidden(batch_size))
+        return states[0]
+
 
 class TrajectoryDiscriminator(nn.Module):
-    """GAN Discriminator"""
-    def __init__(self, dropout=0):
+    def __init__(self,
+                 encoding_dimension: int = 64,
+                 encoder_dropout: float = 0.0,
+                 enocder_num_layers: int = 1,
+                 mlp_structure: list = [64, 128, 1],
+                 mlp_activation: str = "Relu",
+                 mlp_dropout: float = 0.0,
+                 batch_normalization: bool = True):
+        """
+        Because the input for the discriminator is not supposed to be the output of the cae, then the implemented
+            Encoder can not be used in this submodule, we may need to include the encoder inside discriminator manually
+
+        :param encoding_dimension: The dimension the input data will be converted to,
+        :param mlp_structure: A list defining the structure of the mlp in discriminator,
+            Note: The first item in this list, defines the shape of the encoder's hidden state
+        """
         super(TrajectoryDiscriminator, self).__init__()
-        self.encoder = Encoder(input_size=98, hidden_size=64, num_layers=1)
-        # self.contextual_features = ContextualFeatures()
-        # self.fusion = Fusion(pool_dim=64, hidden_size=128, batch_size=1)
-        self.mlp = nn.Sequential(
-            nn.Linear(64, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(64, 32),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(32, 1),
-            )
+
+        self.classifier = make_mlp(layers=mlp_structure,
+                                   activation=mlp_activation,
+                                   dropout=mlp_dropout,
+                                   batch_normalization=batch_normalization)
+
+
+        self.encoder = Discriminator_Encoder(
+            input_size=13,
+            encoding_dimension= encoding_dimension,
+            hidden_size=mlp_structure[0],
+            num_layers=enocder_num_layers,
+            dropout=encoder_dropout
+        )
 
     def forward(self, traj):
-        traj = self.encoder(traj)
-        # image = self.contextual_features(image)
-        # encoded_traj = self.fusion(real_history, traj, image, agent_idx)
-        score = self.mlp(encoded_traj)
-        return score
+        out = self.encoder(traj)
+        scores = self.classifier(out)
+        return scores
 
 
 ##################################################################################

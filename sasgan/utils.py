@@ -7,8 +7,9 @@ import io
 import configparser
 import attrdict
 from typing import Dict
-import torch
+from torch import nn
 import numpy as np
+import torch
 
 # class Logger(object):
 #     """
@@ -200,6 +201,39 @@ def get_tensor_type(args):
         return torch.cuda.FloatTensor
     else:
         return torch.FloatTensor
+
+
+def make_mlp(layers: list,
+             activation: str = "Relu",
+             dropout: float = 0.0,
+             batch_normalization: bool = True):
+    """
+    Makes a mlp with the specified inputs
+    :param layers: a list containing the dimensions of the linear layers
+    :param activation: "Relu" or "LeakyRelu"
+    :param dropout: a float between 0.0 and 1.0
+    :return: the nn.module object constructed with nn.Sequential
+    """
+    nn_layers = []
+    for dim_in, dim_out in zip(layers[:-1], layers[1:]):
+        nn_layers.append(nn.Linear(dim_in, dim_out))
+        if batch_normalization and dim_out != layers[-1]:
+            nn_layers.append(nn.BatchNorm1d(dim_out))
+        if activation == "Relu":
+            nn_layers.append(nn.ReLU())
+        elif activation == "LeakyRelu":
+            nn_layers.append(nn.LeakyReLU())
+        elif activation == "Sigmoid":
+            nn_layers.append(nn.Sigmoid())
+        elif activation == "Tanh":
+            nn_layers.append(nn.Tanh())
+        if dropout > 0:
+            nn_layers.append(nn.Dropout(p=dropout))
+
+    return nn.Sequential(*nn_layers)
+
+def convert_str_to_list(string_list):
+    return [int(item.strip()) for item in string_list.strip('][').split(",")]
 
 if __name__ == '__main__':
     cae_config = config("CAE")

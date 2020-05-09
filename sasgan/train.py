@@ -13,7 +13,7 @@ from data.loader import *
 from utils import *
 from torch.utils.data import DataLoader
 from cae import make_cae
-from models import Generator, TrajectoryDiscriminator, Encoder
+from models import Generator, TrajectoryDiscriminator, Generator_Encoder
 
 
 ##########################################################################################
@@ -23,8 +23,8 @@ from models import Generator, TrajectoryDiscriminator, Encoder
 GENERAL = config("General")
 DIRECTORIES = config("Directories")
 CAE = config("CAE")
-ENCODER = config("Encoder")
-POOLING = config("Pooling")
+# ENCODER = config("Encoder")
+# POOLING = config("Pooling")
 TRAINING = config("Training")
 GENERATOR = config("Generator")
 DISCRIMINATOR = config("Discriminator")
@@ -61,7 +61,7 @@ parser.add_argument("--disc_dropout", default=0.0, type=float)
 parser.add_argument("--d_steps", default=1, type=int)
 parser.add_argument("--d_lr", default=0.0002, type=float)
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 summary_writer_general = SummaryWriter(DIRECTORIES["log"])
@@ -102,29 +102,27 @@ def get_cae():
 def main(args):
     cae_encoder, cae_decoder = get_cae()
 
-    ##########################################################################################
-    #                          Training the rest of the model
-    ##########################################################################################
-    # creating the dataset and dataloader
-    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
-                                   max_agent=int(GENERAL["max_agents"]))
+    # By now the Encoder and the Decoder have been loaded or trained
 
-    data_loader = DataLoader(nuscenes_data,
-                             batch_size=int(GENERAL["batch_size"]),
-                             shuffle=True)
-
-    epoch = 0
-    while epoch < int(TRAINING["num_epochs"]):
-        for i, batch in enumerate(data_loader):
-            rel_past = batch["rel_past"]
-            past = batch[""]
-            latent_trajectories = cae_encoder(batch)
-
-        epoch += 1
-
-    train_loader = DataLoader(nuscenes_data,
-                              batch_size=args.batch_size,
-                              shuffle=True)
+    # nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
+    #                                max_agent=int(GENERAL["max_agents"]))
+    #
+    # data_loader = DataLoader(nuscenes_data,
+    #                          batch_size=int(GENERAL["batch_size"]),
+    #                          shuffle=True)
+    #
+    # epoch = 0
+    # while epoch < int(TRAINING["num_epochs"]):
+    #     for i, batch in enumerate(data_loader):
+    #         rel_past = batch["rel_past"]
+    #         past = batch[""]
+    #         latent_trajectories = cae_encoder(batch)
+    #
+    #     epoch += 1
+    #
+    # train_loader = DataLoader(nuscenes_data,
+    #                           batch_size=args.batch_size,
+    #                           shuffle=True)
 
 """
     # Construct the models
