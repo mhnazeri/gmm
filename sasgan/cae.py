@@ -106,7 +106,7 @@ def make_cae(dataloader_train, summary_writer):
         saving_dictionary = load(loading_path)
         encoder.load_state_dict(saving_dictionary["encoder"])
         decoder.load_state_dict(saving_dictionary["decoder"])
-        optimizer.load_state_dict(saving_dictionary["optim"])
+        optimizer.load_state_dict(saving_dictionary["optimizer"])
         loss = saving_dictionary["loss"]
         start_epoch = saving_dictionary["epoch"] + 1
         step = saving_dictionary["step"]
@@ -114,16 +114,12 @@ def make_cae(dataloader_train, summary_writer):
         logger.debug("Done")
 
     else:
-        logger.info("No saved model, initializing the model...")
+        logger.info("No saved model, initializing...")
         start_epoch = 0
         loss = tensor([0])
-        logger.debug("Done")
         best_loss = inf
         step = 0
-
-
-    # TODO:
-    #   The parameters should be set to unfreeze mode
+        logger.debug("Done")
 
     for epoch in range(start_epoch, start_epoch + iterations):
         logger.debug("Trining the CAE")
@@ -137,14 +133,7 @@ def make_cae(dataloader_train, summary_writer):
 
             samples = (samples - samples.mean()) / samples.std()
 
-            # remove zero rows
-            # valid_rows = []
-            # for row_idx in range(samples.size(0)):
-            #     if not torch.all(samples[row_idx, :] == 0):
-            #         valid_rows.append(row_idx)
-
-            # samples = samples[valid_rows, :]
-
+            # What are these for Mohammad??
             samples.requires_grad = True
             samples.retain_grad()
 
@@ -162,12 +151,14 @@ def make_cae(dataloader_train, summary_writer):
 
             summary_writer.add_scalar("cae_loss", loss, step)
 
-        logger.info(f"TRAINING [{epoch + 1 / start_epoch + iterations}]\t loss: {loss.item():.2f}")
+        logger.info(f"TRAINING [{(epoch + 1)} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
 
-        # The model will be saved in three circumstances:
-        #   1. every d time steps specified on the config file
-        #   2. when the loss was better in the previous iteration compared to best loss ever
-        #   3. after the final iteration
+        """
+        The model will be saved in three circumstances:
+          1. every d time steps specified on the config file
+          2. when the loss was better in the previous iteration compared to best loss ever
+          3. after the final iteration
+        """
 
         if best_loss <= mean(losses) or \
                 (epoch + 1) % save_every_d_epochs == 0 or \
@@ -189,13 +180,19 @@ def make_cae(dataloader_train, summary_writer):
             else:
                 save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
-    # Freeze the parameters on encoder and decoder
-    # Note for mohammad, this does not freeze the waits neccesarily, to do so you have to set requires_grad to false
+    """
+    Freeze the parameters on encoder and decoder
+    > Note for mohammad, this does not freeze the waits necessarily, to do so you have to set requires_grad to false
+    Check this plz: https://medium.com/jun-devpblog/pytorch-6-model-train-vs-model-eval-no-grad-hyperparameter-tuning-3812c216a3bd
+    But later, when training the Whole module we should add the parameters with requires_grad to True to exclude the 
+        parameters related to these submodeules (encoder and decoder)
+    Check this plz: https://discuss.pytorch.org/t/correct-way-to-freeze-layers/26714
+    """
     # encoder.eval()
     # decoder.eval()
 
-    # Todo:
-    #   Freeze the parameters
+    encoder.requires_grad_(False)
+    decoder.requires_grad_(False)
 
     return encoder, decoder
 

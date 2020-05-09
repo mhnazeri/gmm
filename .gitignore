@@ -4,6 +4,7 @@ sasgan/data/exported_json_data
 sasgan/models_state
 .idea
 */logs/*
+*/save/*
 *.mp4
 *.json
 *.sublime-project

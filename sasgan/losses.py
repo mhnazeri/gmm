@@ -73,7 +73,7 @@ def cae_loss(output_encoder, outputs, inputs, lamda=1e-4):
     :param lamda:
     :return:
     """
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     assert (
         outputs.shape == inputs.shape

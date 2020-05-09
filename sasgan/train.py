@@ -61,8 +61,7 @@ parser.add_argument("--disc_dropout", default=0.0, type=float)
 parser.add_argument("--d_steps", default=1, type=int)
 parser.add_argument("--d_lr", default=0.0002, type=float)
 
-
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 summary_writer_general = SummaryWriter(DIRECTORIES["log"])
@@ -90,8 +89,8 @@ def get_cae():
     cae_data = CAEDataset(root)
     data_loader = DataLoader(cae_data,
                       batch_size=int(CAE["batch_size"]),
+                      num_workers=int(GENERAL["num_workers"]),
                       shuffle=True,
-                      num_workers=,
                       drop_last=True)
 
     cae_encoder, cae_decoder = make_cae(data_loader, summary_writer_cae)
@@ -127,7 +126,7 @@ def main(args):
                               batch_size=args.batch_size,
                               shuffle=True)
 
-
+"""
     # Construct the models
     logger.info("Here is the generator")
     g = Generator(args)
@@ -301,6 +300,7 @@ def main(args):
             if (i + 1) % args.save_every_d_epochs == 0 or (i + 1) == start_epoch + args.iterations:
                 torch.save(checkpoint, args.model_dir + "/checkpoint-" + str(i + 1) + ".pt")
 
+"""
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -315,21 +315,8 @@ if __name__ == '__main__':
 
 # May not be used
 
-    # def make_mlp(layers: list, activation: str = "Relu", dropout: float = 0.0):
-    #     nn_layers = []
-    #     for dim_in, dim_out in zip(layers[:-1], layers[1:]):
-    #         nn_layers.append(nn.Linear(dim_in, dim_out))
-    #         if activation == "Relu":
-    #             nn_layers.append(nn.ReLU())
-    #         elif activation == "LeakyRelu":
-    #             nn_layers.append(nn.LeakyReLU())
-    #         if dropout > 0:
-    #             nn_layers.append(nn.Dropout(p=dropout))
-    #
-    #     return nn.Sequential(*nn_layers)
     #
     #
     #
-
-
+    #
 

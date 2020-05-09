@@ -1,7 +1,3 @@
-""" This file contains the implementation of the main models including:
-    1. Encoder
-    2. Contextual Feature Extractor
-"""
 import torch
 import torch.nn as nn
 import numpy as np
@@ -17,9 +13,27 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # The logger used for debugging
 logger = logging.getLogger(__name__)
 
-# tensorboard logger
-global tensorboard_logger
-tensorboard_logger = Logger()
+def make_mlp(layers: list, activation: str = "Relu", dropout: float = 0.0):
+    """
+    Makes a mlp with the specified inputs
+    :param layers: a list containing the dimensions of the linear layers
+    :param activation: "Relu" or "LeakyRelu"
+    :param dropout: a float between 0.0 and 1.0
+    :return: the nn.module object constructed with nn.Sequential
+    """
+    nn_layers = []
+    for dim_in, dim_out in zip(layers[:-1], layers[1:]):
+        nn_layers.append(nn.Linear(dim_in, dim_out))
+        nn_layers.append(nn.BatchNorm1d(dim_out))
+        if activation == "Relu":
+            nn_layers.append(nn.ReLU())
+        elif activation == "LeakyRelu":
+            nn_layers.append(nn.LeakyReLU())
+        if dropout > 0:
+            nn_layers.append(nn.Dropout(p=dropout))
+
+    return nn.Sequential(*nn_layers)
+
 
 ##################################################################################
 #                                    Encoder
@@ -244,17 +258,16 @@ class TrajectoryDiscriminator(nn.Module):
         self.encoder = Encoder(input_size=98, hidden_size=64, num_layers=1)
         # self.contextual_features = ContextualFeatures()
         # self.fusion = Fusion(pool_dim=64, hidden_size=128, batch_size=1)
-        self.mpl = nn.Sequential(
+        self.mlp = nn.Sequential(
             nn.Linear(64, 64),
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Dropout(p=dropout),
             nn.Linear(64, 32),
             nn.BatchNorm1d(32),
-            nn.ReLU()
+            nn.ReLU(),
             nn.Dropout(p=dropout),
             nn.Linear(32, 1),
-            nn.ReLU()
             )
 
     def forward(self, traj):

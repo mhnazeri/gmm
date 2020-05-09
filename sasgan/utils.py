@@ -176,15 +176,20 @@ def checkpoint_path(path):
     if len(processed_path["checkpoint"]) == 0 and "best" not in processed_path:
         return None
 
-    elif loading_strategy == "best":
+    elif loading_strategy == "best" and "best" in processed_path:
         return os.path.join(path, processed_path["best"])
 
-    elif loading_strategy == "last":
+    elif loading_strategy == "best" and "best" not in processed_path:
+        return None
+
+    elif loading_strategy == "last" and "checkpoint" in processed_path:
 
         # Finding the last saved_checkpoint
         directories_list = np.asarray(processed_path["checkpoint"], dtype=object)
         return os.path.join(path, directories_list[directories_list[:, 0].astype(np.int).argmax(), 1])
 
+    else:
+        return None
 
 def get_tensor_type(args):
     """
