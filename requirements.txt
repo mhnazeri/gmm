@@ -50,8 +50,7 @@ msgpack==0.6.2
 nbconvert==5.6.1
 nbformat==5.0.4
 notebook==6.0.3
-numpy==1.18.1
-nuscenes-devkit==1.0.6
+numpy
 opencv-python==4.2.0.32
 packaging==20.1
 pandas==1.0.1
@@ -60,19 +59,14 @@ parso==0.6.1
 pathspec==0.7.0
 pexpect==4.8.0
 pickleshare==0.7.5
-Pillow==7.0.0
+Pillow=
 pluggy==0.13.1
 prometheus-client==0.7.1
 prompt-toolkit==3.0.3
 ptyprocess==0.6.0
 py==1.8.1
 py-cpuinfo==5.0.0
-pycodestyle==2.5.0
-pydocstyle==5.0.2
-pyflakes==2.1.1
 Pygments==2.5.2
-pylint==2.4.4
-pynvim==0.4.1
 pyparsing==2.4.6
 pyquaternion==0.9.5
 pyrsistent==0.15.7
@@ -80,7 +74,6 @@ pytest==5.3.5
 pytest-benchmark==3.2.3
 python-dateutil==2.8.1
 python-jsonrpc-server==0.3.4
-python-language-server==0.31.8
 pytz==2019.3
 pyzmq==18.1.1
 qtconsole==4.6.0
@@ -94,8 +87,6 @@ Shapely==1.7.0
 six==1.14.0
 snowballstemmer==2.0.0
 soupsieve==1.9.5
-termcolor==1.1.0
-terminado==0.8.3
 testpath==0.4.4
 tk==0.1.0
 toml==0.10.0
@@ -111,6 +102,3 @@ wrapt==1.11.2
 xmltodict==0.12.0
 yapf==0.29.0
 zipp==2.2.0
-tensorflow==2.1.0
-tensorflow-estimator==2.1.0
-tensorflow-estimator-2.0-preview==2.0.0
