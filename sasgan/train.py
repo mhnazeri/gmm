@@ -12,56 +12,30 @@ from data.loader import *
 from utils import *
 from torch.utils.data import DataLoader
 from cae import make_cae
-from models import Generator, TrajectoryDiscriminator, Generator_Encoder
+from models import \
+    TrajectoryGenerator, \
+    TrajectoryDiscriminator
 
 
 ##########################################################################################
 #                          Getting the required configuration
 ##########################################################################################
-# Getting the configuration for training
-GENERAL = config("General")
-DIRECTORIES = config("Directories")
-CAE = config("CAE")
-# ENCODER = config("Encoder")
-# POOLING = config("Pooling")
-TRAINING = config("Training")
-GENERATOR = config("Generator")
-DISCRIMINATOR = config("Discriminator")
-
 parser = argparse.ArgumentParser()
 
 # Keep these
 parser.add_argument("--use_gpu", default=False, type=bool)
 
-
-
-# General parameters
-parser.add_argument("--batch_size", default=64, type=int)
-parser.add_argument("--image_size", default=28 * 28, type=int)
-parser.add_argument("--noise_size", default=100, type=int)
-parser.add_argument("--iterations", default=10, type=int)
-
-parser.add_argument("--models_dir", default="./save", type=str)
-parser.add_argument("--loading_strategy", default="last", type=str)
-parser.add_argument("--save_every_d_epochs", default=3, type=int)
-parser.add_argument("--ignore_first_iterations", default=15, type=int)
-
-# Generator parameters
-parser.add_argument("--generator_structure", default=[100, 256, 256, 28 * 28], type=list)
-parser.add_argument("--generator_activation", default="Relu", type=str)
-parser.add_argument("--generator_dropout", default=0.0, type=float)
-parser.add_argument("--g_steps", default=1, type=int)
-parser.add_argument("--g_lr", default=0.002, type=float)
-
-# Discriminator parameters
-parser.add_argument("--disc_structure", default=[28 * 28, 256, 128], type=list)
-parser.add_argument("--disc_activation", default="Relu", type=str)
-parser.add_argument("--disc_dropout", default=0.0, type=float)
-parser.add_argument("--d_steps", default=1, type=int)
-parser.add_argument("--d_lr", default=0.0002, type=float)
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+args = parser.parse_args()
+
+# Getting the configuration for training
+GENERAL = config("System")
+DIRECTORIES = config("Directories")
+CAE = config("CAE")
+TRAINING = config("Training")
+GENERATOR = config("Generator")
+DISCRIMINATOR = config("Discriminator")
 
 summary_writer_general = SummaryWriter(DIRECTORIES["log"])
 summary_writer_generator = SummaryWriter(os.path.join(DIRECTORIES["log"], "generator"))
@@ -94,7 +68,7 @@ def get_cae():
 
     cae_encoder, cae_decoder = make_cae(data_loader, summary_writer_cae)
 
-    logger.debug("Done training/loading the CAE")
+    logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
 
 
@@ -117,31 +91,27 @@ def main(args):
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
-    #
-    # epoch = 0
-    # while epoch < int(TRAINING["num_epochs"]):
-    #     for i, batch in enumerate(data_loader):
-    #         rel_past = batch["rel_past"]
-    #         past = batch[""]
-    #         latent_trajectories = cae_encoder(batch)
-    #
-    #     epoch += 1
-    #
-    # train_loader = DataLoader(nuscenes_data,
-    #                           batch_size=args.batch_size,
-    #                           shuffle=True)
+    input_size = 13
 
-"""
     # Construct the models
+    g = TrajectoryGenerator()
     logger.info("Here is the generator")
-    g = Generator(args)
     logger.info(g)
 
+    d = TrajectoryDiscriminator(
+        input_size=input_size,
+        embedding_dimension=int(TRAINING["embedding_dimension"]),
+        encoder_num_layers=int(DISCRIMINATOR["enocder_num_layers"]),
+        mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
+        mlp_activation=DISCRIMINATOR["mlp_activation"],
+        batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
+        dropout=float(DISCRIMINATOR["dropout"])
+        )
+
     logger.info("Here is the discriminator")
-    d = Discriminator(args)
     logger.info(d)
 
-    # Initilize the weights
+    # Initialize the weights
     g.apply(init_weights)
     d.apply(init_weights)
 
@@ -151,13 +121,13 @@ def main(args):
     d.type(tensor_type).train()
 
     # defining the loss and optimizers for generator and discriminator
-    d_optimizer = torch.optim.Adam(d.parameters(), lr=args.d_lr)
-    g_optimizer = torch.optim.Adam(g.parameters(), lr=args.g_lr)
+    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]))
+    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]))
 
     # Loading the checkpoint if existing
     #   the loading strategy is based on the best accuracy and after every iteration interval
 
-    loading_path = checkpoint_path(args)
+    loading_path = checkpoint_path(DIRECTORIES["save_model"])
     if loading_path is not None:
         logger.info(f"Loading the model in {loading_path}...")
         loaded_dictionary = torch.load(loading_path)
@@ -182,11 +152,12 @@ def main(args):
         d_loss = np.inf
         g_loss = np.inf
 
+"""
     logger.debug("Training the model")
     for i in range(start_epoch, start_epoch + args.iterations):
         g.train()
         d.train()
-        for x_train, _ in train_loader:
+        for x_train, _ in data_loader:
             d_steps_left = args.d_steps
             g_steps_left = args.g_steps
             true_labels = torch.ones(x_train.shape[0], 1)
@@ -308,20 +279,5 @@ def main(args):
 """
 
 if __name__ == '__main__':
-    args = parser.parse_args()
+
     main(args)
-
-
-
-
-
-
-
-
-# May not be used
-
-    #
-    #
-    #
-    #
-

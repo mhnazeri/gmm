@@ -124,16 +124,16 @@ def get_the_number_of_GPUs(logger):
 
     return torch.cuda.device_count()
 
-def config(modeule_name: str=None) -> Dict[str, str]:
+def config(module_name: str=None) -> Dict[str, str]:
     """
     To be completed by mohammad
-    :param modeule_name:
+    :param module_name:
     :return:
     """
     config = configparser.ConfigParser()
     config.read("config.ini")
     try:
-        return config[modeule_name]
+        return config[module_name]
     except KeyError as err:
         print(f"Module name should be one of the:\n "
               f"{config.sections()} not {err}")
@@ -146,7 +146,7 @@ def _get_loading_strategy(model_type:str = "main"):
     :return: str showing the type
     """
     if model_type == "main":
-        return config(["Training"])["loading_strategy"]
+        return config("Training")["loading_strategy"]
 
     elif model_type == "cae":
         return config("CAE")["loading_strategy"]
@@ -217,18 +217,19 @@ def make_mlp(layers: list,
     nn_layers = []
     for dim_in, dim_out in zip(layers[:-1], layers[1:]):
         nn_layers.append(nn.Linear(dim_in, dim_out))
-        if batch_normalization and dim_out != layers[-1]:
-            nn_layers.append(nn.BatchNorm1d(dim_out))
-        if activation == "Relu":
-            nn_layers.append(nn.ReLU())
-        elif activation == "LeakyRelu":
-            nn_layers.append(nn.LeakyReLU())
-        elif activation == "Sigmoid":
-            nn_layers.append(nn.Sigmoid())
-        elif activation == "Tanh":
-            nn_layers.append(nn.Tanh())
-        if dropout > 0:
-            nn_layers.append(nn.Dropout(p=dropout))
+        if dim_out != layers[-1]:
+            if batch_normalization :
+                nn_layers.append(nn.BatchNorm1d(dim_out))
+            if activation == "Relu":
+                nn_layers.append(nn.ReLU())
+            elif activation == "LeakyRelu":
+                nn_layers.append(nn.LeakyReLU())
+            elif activation == "Sigmoid":
+                nn_layers.append(nn.Sigmoid())
+            elif activation == "Tanh":
+                nn_layers.append(nn.Tanh())
+            if dropout > 0:
+                nn_layers.append(nn.Dropout(p=dropout))
 
     return nn.Sequential(*nn_layers)
 

@@ -197,46 +197,83 @@ class Fusion(nn.Module):
         return fused_features_hidden
 
 ##################################################################################
+#                                    Decoder
+# ________________________________________________________________________________
+# Todo: for later
+#      1. implement the pooling every timestep mechanism
+
+
+class Decoder(nn.Module):
+    def __init__(self,
+                 seq_len:int = 10,
+                 encoder=None,
+                 embedding_dim:int = 7,
+                 input_size:int = 13,
+                 hidden_dim:int = 64,
+                 num_layers:int = 1,
+                 dropout:float = 0.0,
+                 decoder_mlp_structure:list = [128],
+                 decoder_mlp_activation:str = "Relu"
+                 ):
+        """
+        The Decoder is responsible to forecast the whole sequence length of the future trajectories
+        :param encoder: the cae encoder module passed to be used as the encoder
+        :param embedding_dim: the embedding dimension which should be the same as the dae latent dim
+        :param input_size: the inout size of the model
+        :param hidden_dim: the hidden dimension of the LSTM module
+        :param decoder_mlp_structure: the structure of mlp used to convert hidden to predictions
+        """
+        super(Decoder, self).__init__()
+
+        self._seq_len = seq_len
+
+
+        if encoder is not None:
+            self.encoder = encoder
+        else:
+            self.encoder = nn.Linear(input_size, embedding_dim)
+
+        self.decoder = nn.LSTM(embedding_dim, hidden_dim,
+                               num_layers, dropout=dropout)
+
+        hidden2pos_struecture = [hidden_dim] + decoder_mlp_structure + [input_size]
+
+        self.hidden2pos = make_mlp(
+            layers=hidden2pos_struecture,
+            activation=decoder_mlp_activation,
+            dropout=dropout,
+            batch_normalization=False
+        )
+
+    def forward(self, traj, traj_rel, last_pos):
+
+        for _ in self._seq_len:
+            pass
+
+
+
+
+##################################################################################
 #                               Generator
 # ________________________________________________________________________________
-class Generator(nn.Module):
+class TrajectoryGenerator(nn.Module):
     """Trajectory generator"""
     def __init__(self,
                  input_size:int =264,
                  hidden_size=32,
                  num_layers=1):
-        super(Generator, self).__init__()
-        self.hidden_size = hidden_size
-        self.decoder = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                                num_layers=num_layers)
-        self.hidden2pos = nn.Linear(hidden_size, 70)
-        # self.hidden2pos = nn.Linear(h_dim, 3)
-
-    def initiate_hidden(self, traj_size):
-        return torch.zeros(traj_size[0], traj_size[1], self.hidden_size)
+        super(TrajectoryGenerator, self).__init__()
 
     def forward(self, traj, hidden_state):
-        # batch = traj.size(0)
-        hidden = (hidden_state, self.initiate_hidden(traj.size()))
-        # traj = traj.view(batch, traj.size(1), 264) # traj.size(1)=264
-        traj, _ = self.decoder(traj, hidden)
-        traj = traj.tolist()
-        traj_pred = []
-        for agent in traj:
-            traj_pred.append(self.hidden2pos(
-                torch.tensor(agent.view(batch, 70))
-                ))
-        # return a vector of size (seq_len, batch, input_size)
-        return torch.cat(traj_pred, dim=0)
-
+        pass
 
 ##################################################################################
 #                               GAN Discriminator
 # ________________________________________________________________________________
-class Discriminator_Encoder(nn.Module):
+class _Discriminator_Encoder(nn.Module):
     def __init__(self,
                  input_size: int = 13,
-                 encoding_dimension: int = 64,
+                 embedding_dimension: int = 64,
                  hidden_size: int = 64,
                  num_layers: int = 1,
                  dropout: float = 0.0):
@@ -245,10 +282,10 @@ class Discriminator_Encoder(nn.Module):
         :param hidden_size: The hidden size of LSTM module
         :param num_layers: Number of the layers for LSTM
         """
-        super(Discriminator_Encoder, self).__init__()
+        super(_Discriminator_Encoder, self).__init__()
 
-        self.linear = nn.Linear(input_size, encoding_dimension)
-        self.encoder = nn.LSTM(encoding_dimension, hidden_size, num_layers, dropout=dropout)
+        self.linear = nn.Linear(input_size, embedding_dimension)
+        self.encoder = nn.LSTM(embedding_dimension, hidden_size, num_layers, dropout=dropout)
 
     def initiate_hidden(self, batch_size):
         return (
@@ -269,18 +306,18 @@ class Discriminator_Encoder(nn.Module):
 
 class TrajectoryDiscriminator(nn.Module):
     def __init__(self,
-                 encoding_dimension: int = 64,
-                 encoder_dropout: float = 0.0,
-                 enocder_num_layers: int = 1,
+                 input_size: int = 13,
+                 embedding_dimension: int = 64,
+                 encoder_num_layers: int = 1,
                  mlp_structure: list = [64, 128, 1],
                  mlp_activation: str = "Relu",
-                 mlp_dropout: float = 0.0,
-                 batch_normalization: bool = True):
+                 batch_normalization: bool = True,
+                 dropout: float = 0.0):
         """
         Because the input for the discriminator is not supposed to be the output of the cae, then the implemented
             Encoder can not be used in this submodule, we may need to include the encoder inside discriminator manually
 
-        :param encoding_dimension: The dimension the input data will be converted to,
+        :param embedding_dimension: The dimension the input data will be converted to,
         :param mlp_structure: A list defining the structure of the mlp in discriminator,
             Note: The first item in this list, defines the shape of the encoder's hidden state
         """
@@ -288,47 +325,22 @@ class TrajectoryDiscriminator(nn.Module):
 
         self.classifier = make_mlp(layers=mlp_structure,
                                    activation=mlp_activation,
-                                   dropout=mlp_dropout,
+                                   dropout=dropout,
                                    batch_normalization=batch_normalization)
 
 
-        self.encoder = Discriminator_Encoder(
-            input_size=13,
-            encoding_dimension= encoding_dimension,
+        self.encoder = _Discriminator_Encoder(
+            input_size=input_size,
+            embedding_dimension= embedding_dimension,
             hidden_size=mlp_structure[0],
-            num_layers=enocder_num_layers,
-            dropout=encoder_dropout
+            num_layers=encoder_num_layers,
+            dropout=dropout
         )
 
     def forward(self, traj):
         out = self.encoder(traj)
         scores = self.classifier(out)
         return scores
-
-
-##################################################################################
-#                              Testing the modules
-# ________________________________________________________________________________
-path_for_json_data = "data/exported_json_data/"
-dataset_dir = "data/nuScene-mini"
-
-# This is the number of the layers which the LSTM cell contains ----> hyper
-num_layers = 10
-
-# This is the feature vector size ---> sure
-input_size = 13
-
-# Number of the frames of the observed trajectories ----> sure
-sequence_length = 80
-
-# The Batch size ------> hyperparameter
-Batch_size = 128
-
-# The number of the cells on each LSTM layer (This parameter acts like the width of the network) --> hyperparameter
-hidden_layers = 2
-
-# The size that the input features will be embedded to using a simple mlp    -----> sure
-embedding_dimensions = 32
 
 if __name__ == '__main__':
     pass
