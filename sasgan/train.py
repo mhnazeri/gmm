@@ -2,9 +2,8 @@
 import torch
 import argparse
 from torch.utils.tensorboard import SummaryWriter
-from torch import nn
+from torchvision import transforms
 import numpy as np
-from torchvision.transforms import ToTensor
 import logging
 import os
 
@@ -104,12 +103,20 @@ def main(args):
 
     # By now the Encoder and the Decoder have been loaded or trained
 
-    # nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
-    #                                max_agent=int(GENERAL["max_agents"]))
-    #
-    # data_loader = DataLoader(nuscenes_data,
-    #                          batch_size=int(GENERAL["batch_size"]),
-    #                          shuffle=True)
+    image_transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+    ])
+
+    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
+                                   max_agent=int(TRAINING["max_agents"]),
+                                   transform=image_transform)
+
+    data_loader = DataLoader(nuscenes_data,
+                             batch_size=int(TRAINING["batch_size"]),
+                             shuffle=True)
+
     #
     # epoch = 0
     # while epoch < int(TRAINING["num_epochs"]):

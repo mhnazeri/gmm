@@ -7,7 +7,6 @@ from utils import *
 import logging
 from data.loader import CAEDataset
 
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # The logger used for debugging
