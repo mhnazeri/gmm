@@ -214,19 +214,21 @@ class Fusion(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self,
-                 seq_len:int = 10,
-                 embedder=None,
-                 embedding_dim:int = 7,
-                 input_size:int = 13,
-                 hidden_dim:int = 64,
-                 num_layers:int = 1,
+                 seq_len: int = 10,
+                 embedder = None,
+                 anti_embedder = None,
+                 embedding_dim: int = 7,
+                 input_size: int = 13,
+                 hidden_dim: int = 64,
+                 num_layers: int = 1,
                  dropout:float = 0.0,
-                 decoder_mlp_structure:list = [128],
-                 decoder_mlp_activation:str = "Relu"
+                 decoder_mlp_structure: list = [128],
+                 decoder_mlp_activation: str = "Relu"
                  ):
         """
         The Decoder is responsible to forecast the whole sequence length of the future trajectories
         :param embedder: the cae encoder module passed to be used as the encoder
+        :param anti_embdder: if not None, the cae decoder will be used for converting hidden state to positions
         :param embedding_dim: the embedding dimension which should be the same as the cae latent dim
         :param input_size: the inout size of the model
         :param hidden_dim: the hidden dimension of the LSTM module
@@ -237,6 +239,7 @@ class Decoder(nn.Module):
         self._seq_len = seq_len
         self._embedding_dim = embedding_dim
         self._num_layers = num_layers
+        self._use_cae_decoder = False
 
         if embedder is not None:
             # This is supposed to be the CAE encoder
@@ -244,21 +247,25 @@ class Decoder(nn.Module):
         else:
             self.embedder = nn.Linear(input_size, embedding_dim)
 
+        if anti_embedder is None:
+            hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [input_size]
+            self.hidden2pos = make_mlp(
+                layers=hidden2pos_structure,
+                activation=decoder_mlp_activation,
+                dropout=dropout,
+                batch_normalization=False
+            )
+
+        else:
+            self._use_cae_decoder = True
+            self.hidden2latent = nn.Linear(hidden_dim, embedding_dim)
+            self.hidden2pos = anti_embedder
+
         self.decoder = nn.LSTM(embedding_dim, hidden_dim,
-                               num_layers, dropout=dropout)
-
-        hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [input_size]
-
-        self.hidden2pos = make_mlp(
-            layers=hidden2pos_structure,
-            activation=decoder_mlp_activation,
-            dropout=dropout,
-            batch_normalization=False
-        )
+                           num_layers, dropout=dropout)
 
     def forward(self, last_features, last_features_rel, state_tuple):
         """
-
         :param state_tuple: A tuple of two states as the initial state of the LSTM where the first item
             contains the required info from the past, both in the shape (num_layers, batch_size, embedding_dim)
         :return: First item is of the shape (sequence_length, batch, input_size)
@@ -270,7 +277,13 @@ class Decoder(nn.Module):
 
         for _ in range(self._seq_len):
             decoder_output, state_tuple = self.decoder(decoder_input, state_tuple)
-            curr_rel = self.hidden2pos(decoder_output)
+
+            if not self._use_cae_decoder:
+                curr_rel = self.hidden2pos(decoder_output[0])
+
+            else:
+                anti_embedder_input = self.hidden2latent(decoder_output[0])
+                curr_rel = self.hidden2pos(anti_embedder_input)
 
             # Todo: to add the every timestep mechanism here
 
@@ -290,7 +303,9 @@ class TrajectoryGenerator(nn.Module):
     """Trajectory generator"""
     def __init__(self,
                  embedder = None,
+                 anti_embedder = None,
                  embedding_dim: int = 7,
+                 encoder_h_dim: int = 64,
                  seq_length: int = 10,
                  input_size: int = 13,
                  decoder_hidden_dim: int = 64,
@@ -303,6 +318,7 @@ class TrajectoryGenerator(nn.Module):
 
         # This module will be used to generate the future trajectory
         self.decoder = Decoder(
+            anti_embedder=anti_embedder,
             embedder=embedder,
             embedding_dim=embedding_dim,
             seq_len=seq_length,
@@ -314,18 +330,26 @@ class TrajectoryGenerator(nn.Module):
             decoder_mlp_structure=decoder_mlp_structure,
         )
 
+        # this module is used at the begining to convert the input features
+        self.encoder = Encoder(
+            embedder=embedder,
+            input_size=input_size,
+            embedding_dim=embedding_dim,
+            encoder_h_dim=encoder_h_dim,
+            dropout=dropout,
+            num_layers=num_layers)
+
         # Use his section to define any other module to be used for pooling or fusion
+        # Todo: add the other required submodules
 
-
-    def forward(self, last_features, last_features_rel):
+    def forward(self, obs_traj, obs_traj_rel):
         """
-        :param last_features: The features of the final timestep of the observed sequence
-            of the shape (batch, input_size)
-        :param last_features_rel: The relative features of the final timestep of the observed sequence
-            of the shape (batch, input_size)
+
+        :param obs_traj: shape (obs_length, batch, inputs_size)
+        :param obs_traj_rel: shape (obs_length, batch, inputs_size)
         :return:
         """
-        batch_size = last_features.shape[0]
+        batch_size = obs_traj.shape[1]
 
         state_tuple = (
             torch.zeros(self._num_layers, batch_size, self._hidden_size),
@@ -338,6 +362,8 @@ class TrajectoryGenerator(nn.Module):
         state_tuple[0] = ...
         """
 
+        last_features = obs_traj[-1]
+        last_features_rel = obs_traj_rel[-1]
         predicted_traj, _ = self.decoder(last_features, last_features_rel, state_tuple)
 
         return predicted_traj
@@ -357,11 +383,9 @@ class TrajectoryDiscriminator(nn.Module):
                  batch_normalization: bool = True,
                  dropout: float = 0.0):
         """
-        :param embedder:
-        :param input_size:
+        :param embedder: if not None, the cae_encoder will be used for embedding otherwise a linear_layer
         :param embedding_dim: The dimension that the input data will be converted to
         (if embedder is not None then it should be the same size as the cae's latent dimension)
-        :param num_layers:
         :param encoder_h_dim: The hidden dimension of the encoder
         :param mlp_structure: A list defining the structure of the mlp in discriminator,
         """
