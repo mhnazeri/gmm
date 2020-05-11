@@ -91,17 +91,16 @@ def main(args):
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
-    input_size = 13
-
     # Construct the models
     g = TrajectoryGenerator()
     logger.info("Here is the generator")
     logger.info(g)
 
     d = TrajectoryDiscriminator(
-        input_size=input_size,
-        embedding_dimension=int(TRAINING["embedding_dimension"]),
-        encoder_num_layers=int(DISCRIMINATOR["enocder_num_layers"]),
+        embedder=cae_encoder,
+        input_size=int(TRAINING["input_size"]),
+        embedding_dim=int(TRAINING["embedding_dimension"]),
+        num_layers=int(TRAINING["num_layers"]),
         mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
         mlp_activation=DISCRIMINATOR["mlp_activation"],
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
