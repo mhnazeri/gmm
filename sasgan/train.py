@@ -67,6 +67,7 @@ def get_cae():
                       shuffle=True,
                       drop_last=True)
 
+<<<<<<< HEAD
     cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
                                         summary_writer=summary_writer_cae,
                                         save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
@@ -81,6 +82,25 @@ def get_cae():
                                         learning_rate=float(CAE["learning_rate"]),
                                         save_every_d_epochs=int(CAE["save_every_d_epochs"]),
                                         ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+||||||| parent of a9d089e... models finished
+    cae_encoder, cae_decoder = make_cae(data_loader, summary_writer_cae)
+=======
+    cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
+                                        summary_writer=summary_writer_cae,
+                                        save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
+                                        encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
+                                        decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
+                                        dropout=float(CAE["dropout"]),
+                                        bn=bool(CAE["batch_normalization"]),
+                                        input_size=int(CAE["input_size"]),
+                                        latent_dim=int(CAE["latent_dimension"]),
+                                        iterations=int(CAE["epochs"]),
+                                        activation=str(CAE["activation"]),
+                                        learning_rate=float(CAE["learning_rate"]),
+                                        save_every_d_epochs=int(CAE["save_every_d_epochs"]),
+                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+
+>>>>>>> a9d089e... models finished
 
     logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
@@ -107,11 +127,19 @@ def main():
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
+<<<<<<< HEAD
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         embedder = cae_encoder
 
     logger.info("building the GAN...")
+||||||| parent of a9d089e... models finished
+=======
+
+
+
+"""
+>>>>>>> a9d089e... models finished
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
@@ -161,8 +189,17 @@ def main():
 
     # Loading the checkpoint if existing
 
+<<<<<<< HEAD
     save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
     loading_path = checkpoint_path(save_dir)
+||||||| parent of a9d089e... models finished
+    loading_path = checkpoint_path(DIRECTORIES["save_model"])
+=======
+
+
+
+    loading_path = checkpoint_path(DIRECTORIES["save_model"])
+>>>>>>> a9d089e... models finished
     if loading_path is not None:
         logger.info(f"Loading the main model...")
         loaded_dictionary = torch.load(loading_path)
