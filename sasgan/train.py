@@ -66,7 +66,21 @@ def get_cae():
                       shuffle=True,
                       drop_last=True)
 
-    cae_encoder, cae_decoder = make_cae(data_loader, summary_writer_cae)
+    cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
+                                        summary_writer=summary_writer_cae,
+                                        save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
+                                        encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
+                                        decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
+                                        dropout=float(CAE["dropout"]),
+                                        bn=bool(CAE["batch_normalization"]),
+                                        input_size=int(CAE["input_size"]),
+                                        latent_dim=int(CAE["latent_dimension"]),
+                                        iterations=int(CAE["epochs"]),
+                                        activation=str(CAE["activation"]),
+                                        learning_rate=float(CAE["learning_rate"]),
+                                        save_every_d_epochs=int(CAE["save_every_d_epochs"]),
+                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+
 
     logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
@@ -91,6 +105,10 @@ def main(args):
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
+
+
+
+"""
     # Construct the models
     g = TrajectoryGenerator()
     logger.info("Here is the generator")
@@ -126,6 +144,9 @@ def main(args):
     # Loading the checkpoint if existing
     #   the loading strategy is based on the best accuracy and after every iteration interval
 
+
+
+
     loading_path = checkpoint_path(DIRECTORIES["save_model"])
     if loading_path is not None:
         logger.info(f"Loading the model in {loading_path}...")
@@ -151,7 +172,6 @@ def main(args):
         d_loss = np.inf
         g_loss = np.inf
 
-"""
     logger.debug("Training the model")
     for i in range(start_epoch, start_epoch + args.iterations):
         g.train()

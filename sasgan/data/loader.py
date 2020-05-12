@@ -53,7 +53,6 @@ class NuSceneDataset(Dataset):
                 # if stamp % 40 == 0:
                 for j in range(4):
                     past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
-
                     image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
 
                 for j in range(4, 14):

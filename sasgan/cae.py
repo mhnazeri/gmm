@@ -15,9 +15,11 @@ import logging
 from losses import cae_loss
 import os
 from numpy import inf, mean
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 sns.set(color_codes=True)
 
 class Encoder_Decoder(nn.Module):
@@ -63,7 +65,22 @@ class Encoder_Decoder(nn.Module):
         return self.mlp(x)
 
 
-def make_cae(dataloader_train, summary_writer):
+def make_cae(
+        dataloader_train,
+        summary_writer,
+        save_dir:str = "save",
+        encoder_structure: list = [128, 128],
+        decoder_structure: list = [128, 128],
+        dropout: float = 0.0,
+        bn: bool = False,
+        input_size: int = 13,
+        latent_dim: int = 16,
+        iterations: int = 500,
+        activation: str = "Relu",
+        learning_rate: float = 0.001,
+        save_every_d_epochs: int = 50,
+        ignore_first_epochs: int = 300,
+        ):
     """
     The following function returns the required cae to be further used in the next sections of the model
     If there is any saved model of cae, It loads according to the loading strategy otherwise it just
@@ -74,36 +91,20 @@ def make_cae(dataloader_train, summary_writer):
     :param dataloader_train: the training data iterator on Tensors with shape (batch_size, 520)
     :return: The trained encoder and decoder model with frozen weights
     """
-    save_dir = os.path.join(config("Directories")["save_model"], "cae")
-
-    # Load the required parameters
-    CAE = config("CAE")
-    encoder_structure = convert_str_to_list(CAE["encoder_structure"])
-    decoder_structure = convert_str_to_list(CAE["decoder_structure"])
-    dropout = float(CAE["dropout"])
-    bn = bool(CAE["batch_normalization"])
-    n_inputs = int(CAE["input_size"])
-    n_latent = int(CAE["latent_dimension"])
-    iterations = int(CAE["epochs"])
-    activation = str(CAE["activation"])
-    learning_rate = float(CAE["learning_rate"])
-    save_every_d_epochs = int(CAE["save_every_d_epochs"])
-    ignore_first_epochs = int(CAE["ignore_first_epochs"])
-
 
     """create the whole cae"""
     encoder = Encoder_Decoder(Encoder=True,
-                              input_size=n_inputs,
+                              input_size=input_size,
                               structure=encoder_structure,
-                              latent_dimension=n_latent,
+                              latent_dimension=latent_dim,
                               dropout=dropout,
                               activation=activation,
                               batch_normalization=bn)
 
     decoder = Encoder_Decoder(Encoder=False,
-                              input_size=n_inputs,
+                              input_size=input_size,
                               structure=decoder_structure,
-                              latent_dimension=n_latent,
+                              latent_dimension=latent_dim,
                               dropout=dropout,
                               activation=activation,
                               batch_normalization=bn)
@@ -211,13 +212,40 @@ def make_cae(dataloader_train, summary_writer):
     return encoder, decoder
 
 if __name__ == "__main__":
-    cae_config = config("CAE")
-    root = config("Paths")["data_root"]
-    data = CAEDataset(root)
-    data = DataLoader(data, batch_size=int(cae_config["batch_size"]), shuffle=True, num_workers=2, drop_last=True)
 
-    latents_list = list(range(1, 8  ))
-    for i, latent in enumerate(latents_list):
-        make_cae(data)
-        plt.legend()
-    plt.show()
+    # This section is for experimenting about the best latent dimension
+    DIRECTORIES = config("Directories")
+    CAE = config("CAE")
+    GENERAL = config("System")
+
+    root = DIRECTORIES["data_root"]
+    cae_data = CAEDataset(root)
+    data_loader = DataLoader(cae_data,
+                             batch_size=int(CAE["batch_size"]),
+                             num_workers=int(GENERAL["num_workers"]),
+                             shuffle=True,
+                             drop_last=True)
+
+    # For testing different results for
+    latent_dim_list = [8, 11, 16, 32, 64]
+
+    for latent_dim in latent_dim_list:
+        summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_test" + str(latent_dim)))
+        temp = os.path.join(DIRECTORIES["save_model"], "cae_test")
+        save_dir = os.path.join(temp, str(latent_dim))
+
+        make_cae(dataloader_train=data_loader,
+                 summary_writer=summary_writer_cae,
+                 save_dir=save_dir,
+                 encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
+                 decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
+                 dropout=float(CAE["dropout"]),
+                 bn=bool(CAE["batch_normalization"]),
+                 input_size=int(CAE["input_size"]),
+                 latent_dim=latent_dim,
+                 iterations=int(CAE["epochs"]),
+                 activation=str(CAE["activation"]),
+                 learning_rate=float(CAE["learning_rate"]),
+                 save_every_d_epochs=int(CAE["save_every_d_epochs"]),
+                 ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+

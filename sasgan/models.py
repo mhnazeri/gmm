@@ -6,6 +6,7 @@ import os
 from utils import *
 import logging
 from data.loader import CAEDataset
+import copy
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -43,7 +44,7 @@ class Encoder(nn.Module):
             torch.zeros(self._num_layers, batch_size, self._hidden_size)
         )
 
-    def forward(self, inputs):
+    def forward(self, inputs, state_tuple=None):
         """
         :param inputs: A tensor of the shape (sequence_length, batch, input_size)
         :return: A tensor of the shape (self.num_layers, batch, self.encoder_h_dim)
@@ -54,7 +55,10 @@ class Encoder(nn.Module):
         # Check the integrity of the shapes
         logger.debug("The size of the inputs: " + str(inputs.size()))
 
-        states = self.initiate_hidden(self.batch_size)
+        if state_tuple is None:
+            states = self.initiate_hidden(self.batch_size)
+        else:
+            states = state_tuple
 
         # Embed the input data to the desired dimension using a cae encoder or a linear layer
         embedder_inputs = inputs.view(-1, self._input_size)
@@ -63,7 +67,7 @@ class Encoder(nn.Module):
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
         lstm_inputs = embedded_features.view(sequence_length, batch, self._embedding_dim)
         _, states = self.lstm(lstm_inputs, states)
-        return states[0]
+        return states
 
 
 ##################################################################################
@@ -209,16 +213,13 @@ class Fusion(nn.Module):
 #                                    Decoder
 # ________________________________________________________________________________
 # Todo: for later
-#       1. implement the pooling every timestep mechanism
-#       2. Not sure about adding for all the features
+#       1. implement the pooling every timestep mechanism ---> Done
+#       2. Not sure about adding for all the features ----> Done
 
 class Decoder(nn.Module):
     def __init__(self,
-                 seq_len: int = 10,
-                 embedder = None,
-                 anti_embedder = None,
-                 embedding_dim: int = 7,
-                 input_size: int = 13,
+                 fusion_length: int = 264,
+                 output_size: int = 7,
                  hidden_dim: int = 64,
                  num_layers: int = 1,
                  dropout:float = 0.0,
@@ -227,110 +228,66 @@ class Decoder(nn.Module):
                  ):
         """
         The Decoder is responsible to forecast the whole sequence length of the future trajectories
-        :param embedder: the cae encoder module passed to be used as the encoder
-        :param anti_embdder: if not None, the cae decoder will be used for converting hidden state to positions
-        :param embedding_dim: the embedding dimension which should be the same as the cae latent dim
-        :param input_size: the inout size of the model
+        :param output_size: the size of the prediction, the default stands for 3(translation) + 4(rotation)
         :param hidden_dim: the hidden dimension of the LSTM module
         :param decoder_mlp_structure: the structure of mlp used to convert hidden to predictions
         """
         super(Decoder, self).__init__()
 
-        self._seq_len = seq_len
-        self._embedding_dim = embedding_dim
         self._num_layers = num_layers
         self._use_cae_decoder = False
 
-        if embedder is not None:
-            # This is supposed to be the CAE encoder
-            self.embedder = embedder
-        else:
-            self.embedder = nn.Linear(input_size, embedding_dim)
+        hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
+        self.hidden2pos = make_mlp(
+            layers=hidden2pos_structure,
+            activation=decoder_mlp_activation,
+            dropout=dropout,
+            batch_normalization=False
+        )
 
-        if anti_embedder is None:
-            hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [input_size]
-            self.hidden2pos = make_mlp(
-                layers=hidden2pos_structure,
-                activation=decoder_mlp_activation,
-                dropout=dropout,
-                batch_normalization=False
-            )
-
-        else:
-            self._use_cae_decoder = True
-            self.hidden2latent = nn.Linear(hidden_dim, embedding_dim)
-            self.hidden2pos = anti_embedder
-
-        self.decoder = nn.LSTM(embedding_dim, hidden_dim,
+        self.decoder = nn.LSTM(fusion_length, hidden_dim,
                            num_layers, dropout=dropout)
 
-    def forward(self, last_features, last_features_rel, state_tuple):
+    def forward(self, last_features, last_features_rel , fused_features, state_tuple):
         """
         :param state_tuple: A tuple of two states as the initial state of the LSTM where the first item
             contains the required info from the past, both in the shape (num_layers, batch_size, embedding_dim)
-        :return: First item is of the shape (sequence_length, batch, input_size)
-            while the second item is of the shape (num_layers, batch, embedding_dim)
         """
-        predicted_traj = []
-        batch = last_features.shape[0]
-        decoder_input = self.embedder(last_features_rel).unsqueeze(0)
+        decoder_input = self.embedder(fused_features).unsqueeze(0)
+        decoder_output, state_tuple = self.decoder(decoder_input, state_tuple)
+        curr_features_rel = self.hidden2pos(decoder_output[0])
 
-        for _ in range(self._seq_len):
-            decoder_output, state_tuple = self.decoder(decoder_input, state_tuple)
+        predicted_traj = last_features.clone()
+        predicted_traj_rel = last_features_rel.clone()
 
-            if not self._use_cae_decoder:
-                curr_rel = self.hidden2pos(decoder_output[0])
+        predicted_traj[:, :7] += curr_features_rel
+        predicted_traj_rel[:, :7] = curr_features_rel
 
-            else:
-                anti_embedder_input = self.hidden2latent(decoder_output[0])
-                curr_rel = self.hidden2pos(anti_embedder_input)
-
-            # Todo: to add the every timestep mechanism here
-
-            # not sure about just adding the other features or not
-            current_features = last_features_rel + curr_rel
-            predicted_traj.append(current_features)
-            decoder_input = self.embedder(curr_rel).view(self._num_layers, batch, self._embedding_dim)
-
-        predicted_traj = torch.stack(predicted_traj, dim=0)
-        return predicted_traj, state_tuple[0]
+        return predicted_traj, predicted_traj_rel, state_tuple
 
 
 ##################################################################################
 #                               Generator
 # ________________________________________________________________________________
-class TrajectoryGenerator(nn.Module):
-    """Trajectory generator"""
-    def __init__(self,
-                 embedder = None,
-                 anti_embedder = None,
-                 embedding_dim: int = 7,
-                 encoder_h_dim: int = 64,
-                 seq_length: int = 10,
-                 input_size: int = 13,
-                 decoder_hidden_dim: int = 64,
-                 decoder_mlp_structure: list = [128],
-                 decoder_mlp_activation: str = "Relu",
-                 dropout: float = 0.0,
-                 num_layers: int = 1):
+class GenerationUnit(nn.Module):
+    """This class is responsible for generating just one frame"""
+    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size,
+                 decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
+                 fusion_hidden_dim, fused_vector_length: int = 264):
 
-        super(TrajectoryGenerator, self).__init__()
+        super(GenerationUnit, self).__init__()
 
-        # This module will be used to generate the future trajectory
         self.decoder = Decoder(
-            anti_embedder=anti_embedder,
-            embedder=embedder,
-            embedding_dim=embedding_dim,
-            seq_len=seq_length,
-            input_size=input_size,
-            hidden_dim=decoder_hidden_dim,
+            fusion_length=fused_vector_length,
+            output_size=input_size,
+            hidden_dim=decoder_h_dim,
             num_layers=num_layers,
             dropout=dropout,
             decoder_mlp_activation=decoder_mlp_activation,
             decoder_mlp_structure=decoder_mlp_structure,
         )
 
-        # this module is used at the begining to convert the input features
+        # This module is used at the beginning to convert the input features
         self.encoder = Encoder(
             embedder=embedder,
             input_size=input_size,
@@ -339,34 +296,115 @@ class TrajectoryGenerator(nn.Module):
             dropout=dropout,
             num_layers=num_layers)
 
-        # Use his section to define any other module to be used for pooling or fusion
-        # Todo: add the other required submodules
+        self.fusion = Fusion(pool_dim=fusion_pool_dim,
+                             hidden_size=fusion_hidden_dim)
 
-    def forward(self, obs_traj, obs_traj_rel):
+        encoder_decoder_mlp_structure = [encoder_h_dim, decoder_h_dim]
+        self.encoder_decoder_h = make_mlp(
+            layers=encoder_decoder_mlp_structure,
+            activation="Relu",
+            batch_normalization=True,
+        )
+
+        self._num_layers = num_layers
+        self._decoder_h_dim = decoder_h_dim
+        self._encoder_h_dim =encoder_h_dim
+
+    def forward(self, obs, obs_rel, context_features):
+        """
+        :param obs: should be of the shape (seq_length, batch, input_size)
+        :param obs_rel: should be of the shape (seq_length, batch, input_size)
+        :param context_features: should be of the shape (batch, 1024, 144)
+        :return: two items:
+            1. predicted_traj: the next absolute features for the observed trajectory: (batch, input_size)
+            2. predicted_traj_rel: the next relative features for the observed trajectory: (batch, input_size)
+        """
+        batch_size = obs_rel.shape[1]
+
+        states = self.encoder(obs_rel)
+        fused_features = self.fusion(obs, obs_rel, states[0], context_features)
+
+        decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
+        decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
+        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim)
+
+        decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
+        return decoder_output[0], decoder_output[1]
+
+
+class TrajectoryGenerator(nn.Module):
+    """The GenerationUnit will be used to forecast for sequence_length"""
+    def __init__(self,
+                 embedder=None,
+                 embedding_dim: int = 7,
+                 encoder_h_dim: int = 64,
+                 decoder_h_dim: int = 64,
+                 seq_length: int = 10,
+                 input_size: int = 13,
+                 decoder_mlp_structure: list = [128],
+                 decoder_mlp_activation: str = "Relu",
+                 dropout: float = 0.0,
+                 fusion_pool_dim:int = 64,
+                 fusion_hidden_dim:int = 64,
+                 context_feature_model_arch:str = "overfeat",
+                 num_layers: int = 1):
+
+        super(TrajectoryGenerator, self).__init__()
+
+        self.context_features = ContextualFeatures(model_arch=context_feature_model_arch)
+
+        self.gu = GenerationUnit(
+            embedder=embedder,
+            embedding_dim=embedding_dim,
+            encoder_h_dim=encoder_h_dim,
+            decoder_h_dim=decoder_h_dim,
+            input_size=input_size,
+            decoder_mlp_structure=decoder_mlp_structure,
+            decoder_mlp_activation=decoder_mlp_activation,
+            dropout=dropout,
+            num_layers=num_layers,
+            fusion_pool_dim=fusion_pool_dim,
+            fusion_hidden_dim=fusion_hidden_dim
+        )
+
+        self._num_layers = num_layers
+        self._seq_len = seq_length
+
+
+    def forward(self, obs_traj, obs_traj_rel, frames):
         """
 
         :param obs_traj: shape (obs_length, batch, inputs_size)
         :param obs_traj_rel: shape (obs_length, batch, inputs_size)
-        :return:
+        :param frames: Tensor of shape (4, 256, 256)
+        :return: final_prediction: shape (seq_length, batch, input_size)
         """
         batch_size = obs_traj.shape[1]
+        obs_length = obs_traj.shape[0]
+        num_frames = frames.shape[0]
+        final_prediction = [obs_traj]
+        final_prediction_rel = [obs_traj_rel]
+        gu_input = obs_traj.clone()
+        gu_input_rel = obs_traj_rel.clone()
 
-        state_tuple = (
-            torch.zeros(self._num_layers, batch_size, self._hidden_size),
-            torch.zeros(self._num_layers, batch_size, self._hidden_size)
-        )
+        context_features = []
+        for i in range(num_frames):
+            context_features.append(self.context_features(frames[i]))
 
-        """
-        Do what ever you want with the state_tuple[0] which stands for the hidden_state to be used
-            in prediction.
-        state_tuple[0] = ...
-        """
+        context_features_sum = sum(torch.Tensor(context_features))
+        # Should be of the shape (batch_size, 1024, 12 * 12)
 
-        last_features = obs_traj[-1]
-        last_features_rel = obs_traj_rel[-1]
-        predicted_traj, _ = self.decoder(last_features, last_features_rel, state_tuple)
+        for _ in range(self._seq_len):
+            predicted_features, predicted_features_rel = self.gu(obs=gu_input,
+                                                                 obs_traj_rel=gu_input_rel,
+                                                                 context_features=context_features_sum)
 
-        return predicted_traj
+            # build the inputs for the next timestep
+            final_prediction = torch.cat(final_prediction + predicted_features, dim=1)
+            gu_input = final_prediction[:, -obs_length:, :]
+            gu_input_rel = torch.cat(final_prediction_rel + predicted_features_rel, dim=1)[:, -obs_length:, :]
+
+        return final_prediction[:, -self._seq_len:, :]
 
 ##################################################################################
 #                               GAN Discriminator
@@ -396,7 +434,6 @@ class TrajectoryDiscriminator(nn.Module):
                                    activation=mlp_activation,
                                    dropout=dropout,
                                    batch_normalization=batch_normalization)
-
 
         self.encoder = Encoder(
             embedder=embedder,
