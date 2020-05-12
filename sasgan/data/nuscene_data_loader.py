@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nuscenes.nuscenes import NuScenes
 import imageio
+import torch
 # from sasgan.data.traj_viz import render_scene_lidar
 
 
