@@ -26,9 +26,8 @@ class NuSceneDataset(Dataset):
         lidar = []
         features = []
         self.data = []
-        # read the list 14 element at a time
+        # read the list 13 element at a time
         num_features = [x for x in range(521) if x % 13 == 0]
-        # start_stop = list(zip(num_features[::14], num_features[14::14]))
         start_stop = list(zip(num_features[:], num_features[1:]))
 
         for file in files:
@@ -49,8 +48,7 @@ class NuSceneDataset(Dataset):
                 past = []
                 future = []
                 image = []
-                # print(stamp)
-                # if stamp % 40 == 0:
+
                 for j in range(4):
                     past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
                     image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
@@ -58,15 +56,20 @@ class NuSceneDataset(Dataset):
                 for j in range(4, 14):
                     future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
 
+                # calculate background motion by subtracting two consecutive images
                 image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
-                rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
+                # we only need 7 first features (translation, rotation) for relative history
+                # a helper to slice out the 7 first features from each frame
+                rel_past = torch.cat(past, 1)
+                rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
+                rel_past = [past_2 - past_1 for past_1, past_2 in zip(rel_past[:], rel_past[1:])]
 
-                # if frame is at the beginning of a scene
+                # if frame is at the beginning of a scene, add zero
                 if stamp == 0:
-                    rel_past.insert(0, torch.zeros_like(past[0]))
+                    rel_past.insert(0, torch.zeros_like(past[0][:, :7]))
                     image.insert(0, torch.zeros_like(image[0]))
                 else:
-                    rel_past.insert(0, past[0] - self.data[-1]["past"][-1])
+                    rel_past.insert(0, (past[0] - self.data[-1]["past"][-1])[:, :7])
                     image.insert(0, image[0] - self.data[-1]["motion"][-1])
 
                 data["past"] = past
@@ -207,9 +210,14 @@ if __name__ == '__main__':
     # data = DataLoader(data, batch_size=1, shuffle=True, num_workers=2, drop_last=True)
     d = data.__getitem__(26)
     print(len(data))
-    # print(d)
-    # print(d["past"])
-    print(type(d["motion"]))
-    print(len(d["motion"]))
-    print(type(d["motion"][0]))
-    print(d["motion"][0].shape)
+    # print("len each data: ", len(d))
+    # # print(d["past"])
+    # print(type(d["motion"]))
+    # print(len(d["motion"]))
+    # print(type(d["motion"][0]))
+    # print(d["motion"][0].shape)
+    print(10*"-"+"past"+10*"-")
+    print(type(d["past"]))
+    print(len(d["past"]))
+    print(type(d["past"][0]))
+    print(d["rel_past"][0].shape)

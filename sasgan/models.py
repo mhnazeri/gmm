@@ -134,18 +134,9 @@ class Fusion(nn.Module):
     def __init__(self, pool_dim=256, hidden_size=128):
         super(Fusion, self).__init__()
         self.hidden_size = hidden_size
-        self.pool_dim = pool_dim
-        # can be removed
-        self.linear = nn.Sequential(nn.Linear(147_456, 147_456 / 2),
-                                    nn.MaxPool(kernel_size=2, stride=2),
-                                    nn.ReLU(),
-                                    nn.Linear(147_456 / 2, pool_dim),
-                                    nn.MaxPool(kernel_size=2, stride=2),
-                                    nn.ReLU())
-
-        self.fuse_traj = nn.LSTM(input_size=39, hidden_size=128)
-        self.fuse_context = nn.LSTM(input_size=144, hidden_size=128)
-
+        # 3 modules that comprise the fusion
+        self.fuse_traj = nn.LSTM(input_size=92, hidden_size=hidden_size)
+        self.fuse_context = nn.LSTM(input_size=144, hidden_size=hidden_size)
         self.fuse = nn.Sequential(nn.Linear(256, 256),
                                     nn.MaxPool(kernel_size=2, stride=2),
                                     nn.ReLU())
@@ -163,49 +154,46 @@ class Fusion(nn.Module):
             return torch.rand(*shape).sub_(0.5).mul_(2.0)
         raise ValueError('Unrecognized noise type "%s"' % noise_type)
 
-    def forward(self, real_history, rel_history, pool, context_feature, agent_idx=-1):
-        """receives the whole feature matrix as input (max_agents * 56)
-        28 is for 2 seconds input (each second is 2 frame, each frame has 14
+    def forward(self, real_past, rel_past, pool, context_feature, agent_idx=-1):
+        """receives the whole feature matrix as input (num_agents * 52)
+        22 is for 2 seconds input (each second is 2 frame, each frame has 13
         features)
         args:
-            real_history: a matrix containing unmodified past locations (100,7)
-            pool: modified past locations (100, 32)
-            context_feature: tensor of size=(1024, 12, 12)=147456
+            real_past: a matrix containing unmodified past locations (num_agents,7)
+            pool: modified past locations (num_agents, 64)
+            context_feature: tensor of size=(1024, 144)
             i: desired agent number to forecast future, if -1, it will predict all the agents at the same time
         """
         batch = pool.size(1)
         sequence_length = pool.size(0)
         if agent_idx == -1:
             agent = pool
-            agent_rel = rel_history[:, :7]
-            # context_feature = context_feature.view(-1) # 147456 digits
-            # context_feature = context_feature.repeat(agent.size(0), 1)
             noise = self.get_noise((agent.size(0), 5))
         else:
-            agent = pool[agent_idx] # a vector of size 32
-            agent_rel = rel_history[agent_idx][:7] # vector of size 7
-            real_history = real_history[agent_idx]
+            agent = pool[agent_idx] # a vector of size 64
+            rel_past = rel_past[agent_idx] # vector of size 7
+            real_past = real_past[agent_idx]
             noise = self.get_noise((5,))
 
-        # agent = self.linear(agent)
-        agent = torch.cat((agent_rel, agent), 1) # vector of 7 + 32 = 39
-        # context_feature = self.linear(context_feature) # vector of size 128
-
-        # cat_features = torch.cat((context_feature, agent), 1) # 167
-        agent = agent.view(-1, batch, 39)
-        context_feature = torch.transpose(context_feature, 1, 0) # (1024, batch, 144)
-
+        # concat relative_past with encoded features (vector of 28 + 64 = 92)
+        agent = torch.cat((rel_past, agent), 1)
+        agent = agent.view(-1, batch, 92)
+        # feed lidar stream to lstm for fusion
         _, traj_hidden, _ = self.fuse_traj(agent,
                                                 self.initiate_hidden(batch, sequence_length))
 
+        # feed camera stream to lstm for fusion (1024, batch, 144)
+        context_feature = torch.transpose(context_feature, 1, 0)
         _, context_hidden, _ = self.fuse_context(context_feature,
                                                 self.initiate_hidden(batch, 1024))
 
+        # fusing the hidden state of two streams together with an mlp
         fused_features = torch.cat((traj_hidden, context_hidden), 1)
         fused_features = self.fuse(fused_features)
-        # dim: 5 + 3 + 256 = 264
+        # concat all features (noise, real_past, fused_features) together to feed to the generator
+        # dim: 5 + 28 + 256 = 289
         fused_features_hidden = torch.cat(
-            (noise, real_history, fused_features),
+            (noise, real_past, fused_features),
             1)
         return fused_features_hidden
 
