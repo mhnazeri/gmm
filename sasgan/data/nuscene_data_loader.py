@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nuscenes.nuscenes import NuScenes
 import imageio
+import torch
 # from sasgan.data.traj_viz import render_scene_lidar
 
 
@@ -213,8 +214,6 @@ def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.nda
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    # backgraound_motion_detector(root)
-    # render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
     for idx in range(len(nusc.scene)):
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
