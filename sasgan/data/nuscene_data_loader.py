@@ -9,7 +9,6 @@ import logging
 import ujson as json
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
 from nuscenes.nuscenes import NuScenes
 import imageio
 # from sasgan.data.traj_viz import render_scene_lidar
@@ -64,7 +63,7 @@ def _sample_annotations(nusc, instance):
                 "movable": movable,
                 "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
                 if movable
-                else torch.zeros(3, dtype=torch.float32),
+                else np.zeros(3, dtype=np.float32).tolist()
             }
         )
 
@@ -215,9 +214,11 @@ def ego_velocity(
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
-    # backgraound_motion_detector(root)
-    # render_scene_lidar(root, nusc, 0, save_path="demo", blit=True)
+    print(f"Total scenes: {len(nusc.scene)}")
+    print("Start converting to json")
+
     for idx in range(len(nusc.scene)):
+        print(f"Convering scene {idx} from {len(nusc.scene)}")
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
     # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")

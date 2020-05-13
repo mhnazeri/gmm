@@ -36,9 +36,7 @@ class NuSceneDataset(Dataset):
 
 
 class CAEDataset(Dataset):
-    """inherited from pytorch dataset builder to facilitate reading, spliting, shuffling data.
-
-    """
+    """CAE dataloader separated from the model dataloader because of the input shape"""
 
     def __init__(self, root_dir: str):
         # self.scene_frames = create_feature_matrix(os.path.join(root_dir,json_file))
