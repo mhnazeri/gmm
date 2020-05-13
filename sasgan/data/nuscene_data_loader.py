@@ -5,7 +5,6 @@ import logging
 import ujson as json
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
 from nuscenes.nuscenes import NuScenes
 import imageio
 import torch
@@ -45,6 +44,7 @@ def _sample_annotations(nusc, instance):
         in "barrier debris pushable_pul trafficcone bicycle_rack"
         else 1
     )
+<<<<<<< HEAD
     if movable:
         while sample_annotation["next"] != "":
             annotation.append(
@@ -65,6 +65,51 @@ def _sample_annotations(nusc, instance):
             )
 
             sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+||||||| parent of 67d4c00... fix extracting json segfault error
+    while sample_annotation["next"] != "":
+        annotation.append(
+            {
+                "translation": sample_annotation["translation"],
+                "rotation": sample_annotation["rotation"],
+                "size": sample_annotation["size"],
+                "visibility": sample_annotation["visibility_token"],
+                "category": sample_annotation["category_name"],
+                "instance_token": sample_annotation["instance_token"],
+                "sample_token": sample_annotation["sample_token"],
+                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                    "timestamp"
+                ],
+                "movable": movable,
+                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                if movable
+                else torch.zeros(3, dtype=torch.float32),
+            }
+        )
+
+        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+=======
+    while sample_annotation["next"] != "":
+        annotation.append(
+            {
+                "translation": sample_annotation["translation"],
+                "rotation": sample_annotation["rotation"],
+                "size": sample_annotation["size"],
+                "visibility": sample_annotation["visibility_token"],
+                "category": sample_annotation["category_name"],
+                "instance_token": sample_annotation["instance_token"],
+                "sample_token": sample_annotation["sample_token"],
+                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                    "timestamp"
+                ],
+                "movable": movable,
+                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                if movable
+                else np.zeros(3, dtype=np.float32).tolist()
+            }
+        )
+
+        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+>>>>>>> 67d4c00... fix extracting json segfault error
 
     return annotation
 
