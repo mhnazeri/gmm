@@ -9,6 +9,7 @@ import logging
 import ujson as json
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 from nuscenes.nuscenes import NuScenes
 import imageio
 # from sasgan.data.traj_viz import render_scene_lidar
@@ -190,24 +191,25 @@ def ego_velocity(
         return pos_diff / time_diff
 
 
-def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
-    im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
-    im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
+# implemented in dataloader
+# def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
+#     im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
+#     im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
 
-    im = im / 255
-    im_2 = im_2 / 255
-    fig = plt.figure()
-    a = fig.add_subplot(3, 1, 1)
-    plt.imshow(im)
-    # print("image 1: ", im.shape)
-    # print("image 2: ", im_2.shape)
-    fig.add_subplot(3, 1, 2)
-    a.set_title("Frame 2")
-    plt.imshow(im_2)
-    a = fig.add_subplot(3, 1, 3)
-    a.set_title("Motion")
-    plt.imshow(im_2 - im, cmap="hot")
-    plt.show()
+#     im = im / 255
+#     im_2 = im_2 / 255
+#     fig = plt.figure()
+#     a = fig.add_subplot(3, 1, 1)
+#     plt.imshow(im)
+#     # print("image 1: ", im.shape)
+#     # print("image 2: ", im_2.shape)
+#     fig.add_subplot(3, 1, 2)
+#     a.set_title("Frame 2")
+#     plt.imshow(im_2)
+#     a = fig.add_subplot(3, 1, 3)
+#     a.set_title("Motion")
+#     plt.imshow(im_2 - im, cmap="hot")
+#     plt.show()
 
 
 if __name__ == "__main__":
