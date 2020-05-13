@@ -5,6 +5,7 @@ import logging
 import ujson as json
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 from nuscenes.nuscenes import NuScenes
 import imageio
 import torch
