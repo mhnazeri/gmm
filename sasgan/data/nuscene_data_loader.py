@@ -5,7 +5,6 @@ import logging
 import ujson as json
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
 from nuscenes.nuscenes import NuScenes
 import imageio
 import torch
@@ -83,7 +82,7 @@ def _sample_annotations(nusc, instance):
                 "movable": movable,
                 "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
                 if movable
-                else torch.zeros(3, dtype=torch.float32),
+                else np.zeros(3, dtype=np.float32).tolist()
             }
         )
 
