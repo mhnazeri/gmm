@@ -27,33 +27,12 @@ class NuSceneDataset(Dataset):
         """
         return desired train data with index idx.
         :param int idx: train data index
-        :return: row idx of train dataset
+        :return: train data with index idx
         """
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         return torch.load(self.files[idx])
-
-    def read_file(self, file: str, feature: str = None):
-        """
-        read json file of a scene.
-        separate different agent's lidar, camera features
-        :param str file: file name of the scene.
-        :param feature: desired feature. (not using this feature currently)
-        :return:
-        """
-        with open(file, "r") as f:
-            data = json.load(f)
-
-        ego = data[:-1]
-        lidar_address = []
-        camera_address = []
-
-        for i in range(len(ego)):
-            lidar_address.append(ego[i]["lidar"])
-            camera_address.append(ego[i]["camera"])
-
-        return lidar_address, camera_address
 
 
 class CAEDataset(Dataset):
