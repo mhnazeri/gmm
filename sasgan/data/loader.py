@@ -32,6 +32,7 @@ class NuSceneDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+
         return torch.load(self.files[idx])
 
 
