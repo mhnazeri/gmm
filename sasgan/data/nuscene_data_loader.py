@@ -1,8 +1,4 @@
 """This module is responsible for loading of NuScene dataset
-TODO:
-1) read sensor data
-2) vectorized data
-3) each scene is a data sample
 """
 import os
 import logging
@@ -47,27 +43,26 @@ def _sample_annotations(nusc, instance):
         in "barrier debris pushable_pul trafficcone bicycle_rack"
         else 1
     )
-    while sample_annotation["next"] != "":
-        annotation.append(
-            {
-                "translation": sample_annotation["translation"],
-                "rotation": sample_annotation["rotation"],
-                "size": sample_annotation["size"],
-                "visibility": sample_annotation["visibility_token"],
-                "category": sample_annotation["category_name"],
-                "instance_token": sample_annotation["instance_token"],
-                "sample_token": sample_annotation["sample_token"],
-                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
-                    "timestamp"
-                ],
-                "movable": movable,
-                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
-                if movable
-                else np.zeros(3, dtype=np.float32).tolist()
-            }
-        )
+    if movable:
+        while sample_annotation["next"] != "":
+            annotation.append(
+                {
+                    "translation": sample_annotation["translation"],
+                    "rotation": sample_annotation["rotation"],
+                    "size": sample_annotation["size"],
+                    "visibility": sample_annotation["visibility_token"],
+                    "category": sample_annotation["category_name"],
+                    "instance_token": sample_annotation["instance_token"],
+                    "sample_token": sample_annotation["sample_token"],
+                    "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                        "timestamp"
+                    ],
+                    "movable": movable,
+                    "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                }
+            )
 
-        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+            sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
 
     return annotation
 
