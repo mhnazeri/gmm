@@ -68,6 +68,7 @@ def get_cae():
                       drop_last=True)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
                                         summary_writer=summary_writer_cae,
                                         save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
@@ -101,6 +102,25 @@ def get_cae():
                                         ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 
 >>>>>>> a9d089e... models finished
+||||||| 3dd7b53
+    cae_encoder, cae_decoder = make_cae(data_loader, summary_writer_cae)
+=======
+    cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
+                                        summary_writer=summary_writer_cae,
+                                        save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
+                                        encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
+                                        decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
+                                        dropout=float(CAE["dropout"]),
+                                        bn=bool(CAE["batch_normalization"]),
+                                        input_size=int(CAE["input_size"]),
+                                        latent_dim=int(CAE["latent_dimension"]),
+                                        iterations=int(CAE["epochs"]),
+                                        activation=str(CAE["activation"]),
+                                        learning_rate=float(CAE["learning_rate"]),
+                                        save_every_d_epochs=int(CAE["save_every_d_epochs"]),
+                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+
+>>>>>>> origin/lazy-dataloader
 
     logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
@@ -128,6 +148,7 @@ def main():
                              shuffle=True)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         embedder = cae_encoder
@@ -140,6 +161,13 @@ def main():
 
 """
 >>>>>>> a9d089e... models finished
+||||||| 3dd7b53
+=======
+
+
+
+"""
+>>>>>>> origin/lazy-dataloader
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
@@ -190,9 +218,16 @@ def main():
     # Loading the checkpoint if existing
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
     loading_path = checkpoint_path(save_dir)
 ||||||| parent of a9d089e... models finished
+||||||| 3dd7b53
+=======
+
+
+
+>>>>>>> origin/lazy-dataloader
     loading_path = checkpoint_path(DIRECTORIES["save_model"])
 =======
 
