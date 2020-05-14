@@ -58,7 +58,7 @@ def _sample_annotations(nusc, instance):
                         "timestamp"
                     ],
                     "movable": movable,
-                    "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                    "velocity": box_velocity(nusc, sample_annotation["token"]).tolist()
                 }
             )
 
@@ -142,7 +142,7 @@ def ego_velocity(
         Estimate the velocity for ego-vehicle.
         If possible, we compute the centered difference between the previous and next frame.
         Otherwise we use the difference between the current and previous/next frame.
-        If the velocity cannot be estimated, values are set to np.nan.
+        If the velocity cannot be estimated, values are set to 0.
         :param sample_annotation_token: Unique sample_annotation identifier.
         :param max_time_diff: Max allowed time diff between consecutive samples that are used to estimate velocities.
         :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
@@ -154,7 +154,7 @@ def ego_velocity(
 
     # Cannot estimate velocity for a single annotation.
     if not has_prev and not has_next:
-        return np.array([np.nan, np.nan, np.nan])
+        return np.array([0.0, 0.0, 0.0])
 
     if has_prev:
         first = nusc.get("sample_data", current["prev"])
@@ -179,8 +179,56 @@ def ego_velocity(
         max_time_diff *= 2
 
     if time_diff > max_time_diff:
-        # If time_diff is too big, don't return an estimate.
-        return np.array([np.nan, np.nan, np.nan])
+        # If time_diff is too big, return 0.
+        return np.array([0.0, 0.0, 0.0])
+    else:
+        return pos_diff / time_diff
+
+
+def box_velocity(nusc, sample_annotation_token: str, max_time_diff: float = 1.5) -> np.ndarray:
+    """
+    Estimate the velocity for an annotation.
+    If possible, we compute the centered difference between the previous and next frame.
+    Otherwise we use the difference between the current and previous/next frame.
+    If the velocity cannot be estimated, values are set to 0.
+    :param sample_annotation_token: Unique sample_annotation identifier.
+    :param max_time_diff: Max allowed time diff between consecutive samples that are used to estimate velocities.
+    :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
+    """
+
+    current = nusc.get('sample_annotation', sample_annotation_token)
+    has_prev = current['prev'] != ''
+    has_next = current['next'] != ''
+
+    # Cannot estimate velocity for a single annotation.
+    if not has_prev and not has_next:
+        return np.array([0.0, 0.0, 0.0])
+
+    if has_prev:
+        first = nusc.get('sample_annotation', current['prev'])
+    else:
+        first = current
+
+    if has_next:
+        last = nusc.get('sample_annotation', current['next'])
+    else:
+        last = current
+
+    pos_last = np.array(last['translation'])
+    pos_first = np.array(first['translation'])
+    pos_diff = pos_last - pos_first
+
+    time_last = 1e-6 * nusc.get('sample', last['sample_token'])['timestamp']
+    time_first = 1e-6 * nusc.get('sample', first['sample_token'])['timestamp']
+    time_diff = time_last - time_first
+
+    if has_next and has_prev:
+        # If doing centered difference, allow for up to double the max_time_diff.
+        max_time_diff *= 2
+
+    if time_diff > max_time_diff:
+        # If time_diff is too big, return 0.
+        return np.array([0.0, 0.0, 0.0])
     else:
         return pos_diff / time_diff
 
