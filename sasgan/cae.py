@@ -116,7 +116,7 @@ def make_cae(
     # Load the CAE if available
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
-        logger.info(f"Loading the model...")
+        logger.info(f"Loading the model inf {loading_path}...")
         saving_dictionary = load(loading_path)
         encoder.load_state_dict(saving_dictionary["encoder"])
         decoder.load_state_dict(saving_dictionary["decoder"])
@@ -226,7 +226,7 @@ if __name__ == "__main__":
                              shuffle=True,
                              drop_last=True)
 
-    # For testing different results for
+    # Change this for experimenting other latent dims
     latent_dim_list = [8, 11, 16, 32, 64]
 
     for latent_dim in latent_dim_list:

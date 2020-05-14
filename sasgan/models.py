@@ -111,7 +111,7 @@ class ContextualFeatures(nn.Module):
             self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
                                  kernel_size=1, stride=1)
 
-    def forward(self, frame: np.ndarray):
+    def forward(self, frame: torch.Tensor):
         batch = frame.size(0)
         frame = self.layer_1(frame)
         frame = self.layer_2(frame)
@@ -223,7 +223,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self._num_layers = num_layers
-        self._use_cae_decoder = False
+        self._output_size = output_size
 
         hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
         self.hidden2pos = make_mlp(
@@ -248,8 +248,8 @@ class Decoder(nn.Module):
         predicted_traj = last_features.clone()
         predicted_traj_rel = last_features_rel.clone()
 
-        predicted_traj[:, :7] += curr_features_rel
-        predicted_traj_rel[:, :7] = curr_features_rel
+        predicted_traj[:, :self._output_size] += curr_features_rel
+        predicted_traj_rel[:, :self._output_size] = curr_features_rel
 
         return predicted_traj, predicted_traj_rel, state_tuple
 
@@ -259,7 +259,7 @@ class Decoder(nn.Module):
 # ________________________________________________________________________________
 class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
-    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size,
+    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
                  fusion_hidden_dim, fused_vector_length: int = 264):
 
@@ -267,7 +267,7 @@ class GenerationUnit(nn.Module):
 
         self.decoder = Decoder(
             fusion_length=fused_vector_length,
-            output_size=input_size,
+            output_size=output_size,
             hidden_dim=decoder_h_dim,
             num_layers=num_layers,
             dropout=dropout,
@@ -329,6 +329,7 @@ class TrajectoryGenerator(nn.Module):
                  decoder_h_dim: int = 64,
                  seq_length: int = 10,
                  input_size: int = 13,
+                 output_size:int = 7, 	# 3(transformation) + 4(rotation)
                  decoder_mlp_structure: list = [128],
                  decoder_mlp_activation: str = "Relu",
                  dropout: float = 0.0,
@@ -347,6 +348,7 @@ class TrajectoryGenerator(nn.Module):
             encoder_h_dim=encoder_h_dim,
             decoder_h_dim=decoder_h_dim,
             input_size=input_size,
+            output_size=output_size,
             decoder_mlp_structure=decoder_mlp_structure,
             decoder_mlp_activation=decoder_mlp_activation,
             dropout=dropout,
@@ -361,7 +363,6 @@ class TrajectoryGenerator(nn.Module):
 
     def forward(self, obs_traj, obs_traj_rel, frames):
         """
-
         :param obs_traj: shape (obs_length, batch, inputs_size)
         :param obs_traj_rel: shape (obs_length, batch, inputs_size)
         :param frames: Tensor of shape (4, 256, 256)
@@ -369,14 +370,13 @@ class TrajectoryGenerator(nn.Module):
         """
         batch_size = obs_traj.shape[1]
         obs_length = obs_traj.shape[0]
-        num_frames = frames.shape[0]
         final_prediction = [obs_traj]
         final_prediction_rel = [obs_traj_rel]
         gu_input = obs_traj.clone()
         gu_input_rel = obs_traj_rel.clone()
 
         context_features = []
-        for i in range(num_frames):
+        for i in range(obs_length):
             context_features.append(self.context_features(frames[i]))
 
         context_features_sum = sum(torch.Tensor(context_features))
@@ -403,7 +403,7 @@ class TrajectoryDiscriminator(nn.Module):
                  input_size: int = 13,
                  embedding_dim: int = 7,
                  num_layers: int = 1,
-                 encoder_h_dim:int = 64,
+                 encoder_h_dim: int = 64,
                  mlp_structure: list = [64, 128, 1],
                  mlp_activation: str = "Relu",
                  batch_normalization: bool = True,

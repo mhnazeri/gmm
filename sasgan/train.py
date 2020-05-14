@@ -9,6 +9,7 @@ import os
 
 # Custom defined packages
 from data.loader import *
+from losses import bce_loss
 from utils import *
 from torch.utils.data import DataLoader
 from cae import make_cae
@@ -73,20 +74,19 @@ def get_cae():
                                         decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
                                         dropout=float(CAE["dropout"]),
                                         bn=bool(CAE["batch_normalization"]),
-                                        input_size=int(CAE["input_size"]),
-                                        latent_dim=int(CAE["latent_dimension"]),
+                                        input_size=int(TRAINING["input_size"]),
+                                        latent_dim=int(CAE["embedding_dim"]),
                                         iterations=int(CAE["epochs"]),
                                         activation=str(CAE["activation"]),
                                         learning_rate=float(CAE["learning_rate"]),
                                         save_every_d_epochs=int(CAE["save_every_d_epochs"]),
                                         ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 
-
     logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
 
 
-def main(args):
+def main():
     cae_encoder, cae_decoder = get_cae()
 
     # By now the Encoder and the Decoder have been loaded or trained
@@ -97,6 +97,8 @@ def main(args):
         transforms.ToTensor(),
     ])
 
+    logger.info("Preparing the dataloader for the main model...")
+
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
                                    max_agent=int(TRAINING["max_agents"]),
                                    transform=image_transform)
@@ -105,20 +107,36 @@ def main(args):
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
+    embedder = None
+    if bool(GENERATOR["use_cae_encoder"]):
+        embedder = cae_encoder
 
-
-
-"""
+    logger.info("building the GAN...")
     # Construct the models
-    g = TrajectoryGenerator()
+    g = TrajectoryGenerator(
+        embedder=embedder,
+        embedding_dim=int(CAE["embedding_dim"]),
+        encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
+        decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
+        seq_length=int(GENERATOR["seq_length"]),
+        input_size=int(TRAINING["input_size"]),
+        decoder_mlp_structure=convert_str_to_list(GENERATOR["decoder_h2p_structure"]),
+        decoder_mlp_activation=str(GENERATOR["decoder_h2p_activation"]),
+        dropout=float(GENERATOR["dropout"]),
+        fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
+        fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
+        context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
+        num_layers=int(GENERATOR["num_layers"])
+    )
     logger.info("Here is the generator")
     logger.info(g)
 
     d = TrajectoryDiscriminator(
         embedder=cae_encoder,
         input_size=int(TRAINING["input_size"]),
-        embedding_dim=int(TRAINING["embedding_dimension"]),
+        embedding_dim=int(CAE["embedding_dim"]),
         num_layers=int(TRAINING["num_layers"]),
+        encoder_h_dim=int(DISCRIMINATOR["encoder_h_dim"]),
         mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
         mlp_activation=DISCRIMINATOR["mlp_activation"],
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
@@ -142,14 +160,11 @@ def main(args):
     g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]))
 
     # Loading the checkpoint if existing
-    #   the loading strategy is based on the best accuracy and after every iteration interval
 
-
-
-
-    loading_path = checkpoint_path(DIRECTORIES["save_model"])
+    save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
+    loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
-        logger.info(f"Loading the model in {loading_path}...")
+        logger.info(f"Loading the main model...")
         loaded_dictionary = torch.load(loading_path)
         g.load_state_dict(loaded_dictionary["generator"])
         d.load_state_dict(loaded_dictionary["discriminator"])
@@ -157,30 +172,45 @@ def main(args):
         d_optimizer.load_state_dict(loaded_dictionary["d_optimizer"])
         start_epoch = loaded_dictionary["epoch"] + 1
         step = loaded_dictionary["step"]
-        best_validation_loss = loaded_dictionary["best_validation_loss"]
-        total_validation_loss = loaded_dictionary["total_validation_loss"]
+        best_ADE_loss = loaded_dictionary["best_ADE_loss"]
         g_loss = loaded_dictionary["current_g_loss"]
         d_loss = loaded_dictionary["current_d_loss"]
-        logger.debug(f"Done loading the model in {loading_path}")
+        logger.info(f"Done loading the model in {loading_path}")
 
     else:
         logger.info(f"No saved checkpoint, Initializing...")
         step = 0
         start_epoch = 0
-        best_validation_loss = np.inf
-        total_validation_loss = 0
+        best_ADE_loss = np.inf
         d_loss = np.inf
         g_loss = np.inf
 
     logger.debug("Training the model")
-    for i in range(start_epoch, start_epoch + args.iterations):
+    for epoch in range(start_epoch, start_epoch + int(TRAINING["epochs"])):
         g.train()
         d.train()
-        for x_train, _ in data_loader:
+        for batch in data_loader:
             d_steps_left = args.d_steps
             g_steps_left = args.g_steps
-            true_labels = torch.ones(x_train.shape[0], 1)
-            fake_labels = torch.zeros(x_train.shape[0], 1)
+
+            true_labels = torch.ones(batch.shape[0], 1)
+            fake_labels = torch.zeros(batch.shape[0], 1)
+            while g_steps_left > 0:
+                ###################################################################
+                #                 training the generator
+                ###################################################################
+                logger.debug("Training the generator")
+                fake_traj = g(batch["past"], batch["past_rel"], batch["motion"])
+                fake_prediction = d(fake_traj)
+
+                g_loss = bce_loss(fake_prediction, true_labels)
+
+                summary_writer_generator.add_scalar("Loss", g_loss, step)
+
+                g_optimizer.zero_grad()
+                g_loss.backward()
+                g_optimizer.step()
+                g_steps_left -= 1
 
             while d_steps_left > 0:
                 ###################################################################
@@ -188,115 +218,63 @@ def main(args):
                 ###################################################################
                 logger.debug("Training the discriminator")
 
-                noise_tensor = torch.normal(0.0, 1.0, (x_train.shape[0], args.noise_size))
-
-                x_train = x_train.reshape(-1, args.image_size)
-                real_predictions = d(x_train)
+                real_predictions = d(batch["rel_past"])
                 real_loss = bce_loss(real_predictions, true_labels)
 
-                fake_images = g(noise_tensor)
-                fake_prediction = d(fake_images)
+                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+                fake_prediction = d(fake_traj)
                 fake_loss = bce_loss(fake_prediction, fake_labels)
 
                 d_loss = fake_loss + real_loss
 
-                summary_writer_discriminator.add_scalar("Loss", d_loss, i)
+                summary_writer_discriminator.add_scalar("Loss", d_loss, step)
 
                 d_optimizer.zero_grad()
                 d_loss.backward()
                 d_optimizer.step()
                 d_steps_left -= 1
 
-            while g_steps_left > 0:
-                ###################################################################
-                #                 training the generator
-                ###################################################################
-                logger.debug("Training the generator")
-                noise_tensor = torch.normal(0.0, 1.0, (x_train.shape[0], args.noise_size))
-                fake_images = g(noise_tensor)
-                fake_prediction = d(fake_images)
-
-                g_loss = bce_loss(fake_prediction, true_labels)
-
-                summary_writer_generator.add_scalar("Loss", g_loss, i)
-
-                g_optimizer.zero_grad()
-                g_loss.backward()
-                g_optimizer.step()
-                g_steps_left -= 1
-
             step += 1
 
         if args.iterations > 0:
             logger.info(
-                f"TRAINING[{i + 1}/{start_epoch + args.iterations}]\td_loss:{d_loss:.2f}\tg_loss:{g_loss:.2f}")
-            summary_writer_general.add_images(f"samples_images_iteration_{i}",
-                                              fake_images[np.random.randint(0, x_train.shape[0], 5)].squeeze(1).
-                                              reshape([-1, 1, int(args.image_size ** 0.5),
-                                                       int(args.image_size ** 0.5)]))
+                f"TRAINING[{epoch + 1}/{start_epoch + args.iterations}]\td_loss:{d_loss:.2f}\tg_loss:{g_loss:.2f}")
+
+            # Todo: show some qualitative results of the predictions
 
         with torch.no_grad():
             logger.debug("Evaluating the model")
             g.eval()
             d.eval()
 
-            for x_test, _ in test_loader:
-                # Discriminator part
-                noise_tensor = torch.normal(0.0, 1.0, (x_train.shape[0], args.noise_size))
-                fake_labels = torch.zeros(x_train.shape[0])
-                true_labels = torch.ones(x_train.shape[0])
+            ADE_loss = 0
 
-                generated_images = g(noise_tensor)
-                fake_scores = d(generated_images)
-                fake_loss = bce_loss(fake_scores, fake_labels)
+            # Todo: Calculate the FDE and ADE in this section for validation
 
-                x_test = x_test.reshape(-1, args.image_size)
-                true_scores = d(x_test)
-                true_loss = bce_loss(true_scores, true_labels)
+            validation_loss = ADE_loss.item()
 
-                validation_d_loss = true_loss + fake_loss
-
-                # Generator part
-                noise_tensor = torch.normal(0.0, 1.0, (x_train.shape[0], args.noise_size))
-                generated_images = g(noise_tensor)
-                fake_scores = d(generated_images)
-
-                validation_g_loss = bce_loss(fake_scores, true_labels)
-
-                # Combine the losses
-                total_validation_loss = validation_d_loss + validation_g_loss
-
-            logger.info(f"VALIDATING\ttotal evaluation loss:"
-                        f"{total_validation_loss:.2f}\tg_loss:{validation_g_loss:.2f}\td_loss:{validation_d_loss:.2f}")
-            summary_writer_general.add_scalar("total_evaluation_loss", total_validation_loss, i)
-
-        total_validation_loss = total_validation_loss.item()
         # check if it is time to save a checkpoint of the model
-        if total_validation_loss <= best_validation_loss or \
-                (i + 1) % args.save_every_d_epochs == 0 or \
-                (i + 1) == start_epoch + args.iterations:
+        if validation_loss <= best_ADE_loss or \
+                (epoch + 1) % int(TRAINING["save_every_d_steps"]) == 0 or \
+                (epoch + 1) == start_epoch + int(TRAINING["epochs"]):
             logger.info("Saving the model....")
             checkpoint = {
-                "epoch": i,
+                "epoch": epoch,
                 "step": step,
                 "generator": g.state_dict(),
                 "discriminator": d.state_dict(),
                 "g_optimizer": g_optimizer.state_dict(),
                 "d_optimizer": d_optimizer.state_dict(),
-                "best_validation_loss": best_validation_loss,
+                "best_ADE_loss": best_ADE_loss,
                 "current_d_loss": d_loss,
                 "current_g_loss": g_loss,
-                "total_validation_loss": total_validation_loss
             }
-            if total_validation_loss <= best_validation_loss and i > args.ignore_first_iterations:
-                best_validation_loss = total_validation_loss
-                torch.save(checkpoint, args.model_dir + "/best.pt")
+            if validation_loss <= best_ADE_loss and epoch > args.ignore_first_iterations:
+                best_ADE_loss = validation_loss
+                torch.save(checkpoint, save_dir + "/best.pt")
 
-            if (i + 1) % args.save_every_d_epochs == 0 or (i + 1) == start_epoch + args.iterations:
-                torch.save(checkpoint, args.model_dir + "/checkpoint-" + str(i + 1) + ".pt")
-
-"""
+            if (epoch + 1) % args.save_every_d_epochs == 0 or (epoch + 1) == start_epoch + args.iterations:
+                torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
 if __name__ == '__main__':
-
-    main(args)
+    main()
