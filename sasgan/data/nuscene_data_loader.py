@@ -1,8 +1,4 @@
 """This module is responsible for loading of NuScene dataset
-TODO:
-1) read sensor data
-2) vectorized data
-3) each scene is a data sample
 """
 import os
 import logging
@@ -48,6 +44,28 @@ def _sample_annotations(nusc, instance):
         in "barrier debris pushable_pul trafficcone bicycle_rack"
         else 1
     )
+<<<<<<< HEAD
+    if movable:
+        while sample_annotation["next"] != "":
+            annotation.append(
+                {
+                    "translation": sample_annotation["translation"],
+                    "rotation": sample_annotation["rotation"],
+                    "size": sample_annotation["size"],
+                    "visibility": sample_annotation["visibility_token"],
+                    "category": sample_annotation["category_name"],
+                    "instance_token": sample_annotation["instance_token"],
+                    "sample_token": sample_annotation["sample_token"],
+                    "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                        "timestamp"
+                    ],
+                    "movable": movable,
+                    "velocity": box_velocity(nusc, sample_annotation["token"]).tolist()
+                }
+            )
+
+            sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+||||||| parent of 67d4c00... fix extracting json segfault error
     while sample_annotation["next"] != "":
         annotation.append(
             {
@@ -64,11 +82,34 @@ def _sample_annotations(nusc, instance):
                 "movable": movable,
                 "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
                 if movable
-                else torch.zeros(3, dtype=torch.float32),
+                else np.zeros(3, dtype=np.float32).tolist()
             }
         )
 
         sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+=======
+    while sample_annotation["next"] != "":
+        annotation.append(
+            {
+                "translation": sample_annotation["translation"],
+                "rotation": sample_annotation["rotation"],
+                "size": sample_annotation["size"],
+                "visibility": sample_annotation["visibility_token"],
+                "category": sample_annotation["category_name"],
+                "instance_token": sample_annotation["instance_token"],
+                "sample_token": sample_annotation["sample_token"],
+                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
+                    "timestamp"
+                ],
+                "movable": movable,
+                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
+                if movable
+                else np.zeros(3, dtype=np.float32).tolist()
+            }
+        )
+
+        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
+>>>>>>> 67d4c00... fix extracting json segfault error
 
     return annotation
 
@@ -148,7 +189,7 @@ def ego_velocity(
         Estimate the velocity for ego-vehicle.
         If possible, we compute the centered difference between the previous and next frame.
         Otherwise we use the difference between the current and previous/next frame.
-        If the velocity cannot be estimated, values are set to np.nan.
+        If the velocity cannot be estimated, values are set to 0.
         :param sample_annotation_token: Unique sample_annotation identifier.
         :param max_time_diff: Max allowed time diff between consecutive samples that are used to estimate velocities.
         :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
@@ -160,7 +201,7 @@ def ego_velocity(
 
     # Cannot estimate velocity for a single annotation.
     if not has_prev and not has_next:
-        return np.array([np.nan, np.nan, np.nan])
+        return np.array([0.0, 0.0, 0.0])
 
     if has_prev:
         first = nusc.get("sample_data", current["prev"])
@@ -185,36 +226,89 @@ def ego_velocity(
         max_time_diff *= 2
 
     if time_diff > max_time_diff:
-        # If time_diff is too big, don't return an estimate.
-        return np.array([np.nan, np.nan, np.nan])
+        # If time_diff is too big, return 0.
+        return np.array([0.0, 0.0, 0.0])
     else:
         return pos_diff / time_diff
 
 
-def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
-    im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
-    im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
+def box_velocity(nusc, sample_annotation_token: str, max_time_diff: float = 1.5) -> np.ndarray:
+    """
+    Estimate the velocity for an annotation.
+    If possible, we compute the centered difference between the previous and next frame.
+    Otherwise we use the difference between the current and previous/next frame.
+    If the velocity cannot be estimated, values are set to 0.
+    :param sample_annotation_token: Unique sample_annotation identifier.
+    :param max_time_diff: Max allowed time diff between consecutive samples that are used to estimate velocities.
+    :return: <np.float: 3>. Velocity in x/y/z direction in m/s.
+    """
 
-    im = im / 255
-    im_2 = im_2 / 255
-    fig = plt.figure()
-    a = fig.add_subplot(3, 1, 1)
-    plt.imshow(im)
-    # print("image 1: ", im.shape)
-    # print("image 2: ", im_2.shape)
-    fig.add_subplot(3, 1, 2)
-    a.set_title("Frame 2")
-    plt.imshow(im_2)
-    a = fig.add_subplot(3, 1, 3)
-    a.set_title("Motion")
-    plt.imshow(im_2 - im, cmap="hot")
-    plt.show()
+    current = nusc.get('sample_annotation', sample_annotation_token)
+    has_prev = current['prev'] != ''
+    has_next = current['next'] != ''
+
+    # Cannot estimate velocity for a single annotation.
+    if not has_prev and not has_next:
+        return np.array([0.0, 0.0, 0.0])
+
+    if has_prev:
+        first = nusc.get('sample_annotation', current['prev'])
+    else:
+        first = current
+
+    if has_next:
+        last = nusc.get('sample_annotation', current['next'])
+    else:
+        last = current
+
+    pos_last = np.array(last['translation'])
+    pos_first = np.array(first['translation'])
+    pos_diff = pos_last - pos_first
+
+    time_last = 1e-6 * nusc.get('sample', last['sample_token'])['timestamp']
+    time_first = 1e-6 * nusc.get('sample', first['sample_token'])['timestamp']
+    time_diff = time_last - time_first
+
+    if has_next and has_prev:
+        # If doing centered difference, allow for up to double the max_time_diff.
+        max_time_diff *= 2
+
+    if time_diff > max_time_diff:
+        # If time_diff is too big, return 0.
+        return np.array([0.0, 0.0, 0.0])
+    else:
+        return pos_diff / time_diff
+
+
+# implemented in dataloader
+# def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
+#     im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
+#     im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
+
+#     im = im / 255
+#     im_2 = im_2 / 255
+#     fig = plt.figure()
+#     a = fig.add_subplot(3, 1, 1)
+#     plt.imshow(im)
+#     # print("image 1: ", im.shape)
+#     # print("image 2: ", im_2.shape)
+#     fig.add_subplot(3, 1, 2)
+#     a.set_title("Frame 2")
+#     plt.imshow(im_2)
+#     a = fig.add_subplot(3, 1, 3)
+#     a.set_title("Motion")
+#     plt.imshow(im_2 - im, cmap="hot")
+#     plt.show()
 
 
 if __name__ == "__main__":
     root = "nuScene-mini"
     nusc = load_dataset(root, verbose=False)
+    print(f"Total scenes: {len(nusc.scene)}")
+    print("Start converting to json")
+
     for idx in range(len(nusc.scene)):
+        print(f"Convering scene {idx} from {len(nusc.scene)}")
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
     # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")

@@ -82,6 +82,7 @@ def get_cae():
                                         save_every_d_epochs=int(CAE["save_every_d_epochs"]),
                                         ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 
+
     logger.info("Done training/loading the CAE!")
     return cae_encoder, cae_decoder
 
