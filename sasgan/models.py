@@ -236,29 +236,6 @@ class Decoder(nn.Module):
 ||||||| parent of a9d089e... models finished
         self._use_cae_decoder = False
 
-<<<<<<< HEAD
-        if embedder is not None:
-            # This is supposed to be the CAE encoder
-            self.embedder = embedder
-        else:
-            self.embedder = nn.Linear(input_size, embedding_dim)
-
-        if anti_embedder is None:
-            hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [input_size]
-            self.hidden2pos = make_mlp(
-                layers=hidden2pos_structure,
-                activation=decoder_mlp_activation,
-                dropout=dropout,
-                batch_normalization=False
-            )
-
-        else:
-            self._use_cae_decoder = True
-            self.hidden2latent = nn.Linear(hidden_dim, embedding_dim)
-            self.hidden2pos = anti_embedder
-=======
-        self._use_cae_decoder = False
-
         hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
         self.hidden2pos = make_mlp(
             layers=hidden2pos_structure,
@@ -266,36 +243,6 @@ class Decoder(nn.Module):
             dropout=dropout,
             batch_normalization=False
         )
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-        if embedder is not None:
-            # This is supposed to be the CAE encoder
-            self.embedder = embedder
-        else:
-            self.embedder = nn.Linear(input_size, embedding_dim)
-
-        if anti_embedder is None:
-            hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [input_size]
-            self.hidden2pos = make_mlp(
-                layers=hidden2pos_structure,
-                activation=decoder_mlp_activation,
-                dropout=dropout,
-                batch_normalization=False
-            )
-
-        else:
-            self._use_cae_decoder = True
-            self.hidden2latent = nn.Linear(hidden_dim, embedding_dim)
-            self.hidden2pos = anti_embedder
-=======
-        hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
-        self.hidden2pos = make_mlp(
-            layers=hidden2pos_structure,
-            activation=decoder_mlp_activation,
-            dropout=dropout,
-            batch_normalization=False
-        )
->>>>>>> origin/lazy-dataloader
 
         self.decoder = nn.LSTM(fusion_length, hidden_dim,
                            num_layers, dropout=dropout)
@@ -312,24 +259,8 @@ class Decoder(nn.Module):
         predicted_traj = last_features.clone()
         predicted_traj_rel = last_features_rel.clone()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-        predicted_traj[:, :self._output_size] += curr_features_rel
-        predicted_traj_rel[:, :self._output_size] = curr_features_rel
-||||||| parent of a9d089e... models finished
-            if not self._use_cae_decoder:
-                curr_rel = self.hidden2pos(decoder_output[0])
-=======
         predicted_traj[:, :7] += curr_features_rel
         predicted_traj_rel[:, :7] = curr_features_rel
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-            if not self._use_cae_decoder:
-                curr_rel = self.hidden2pos(decoder_output[0])
-=======
-        predicted_traj[:, :7] += curr_features_rel
-        predicted_traj_rel[:, :7] = curr_features_rel
->>>>>>> origin/lazy-dataloader
 
         return predicted_traj, predicted_traj_rel, state_tuple
 
@@ -337,73 +268,6 @@ class Decoder(nn.Module):
 ##################################################################################
 #                               Generator
 # ________________________________________________________________________________
-<<<<<<< HEAD
-<<<<<<< HEAD
-class GenerationUnit(nn.Module):
-    """This class is responsible for generating just one frame"""
-    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
-                 decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 264):
-
-        super(GenerationUnit, self).__init__()
-
-        self.decoder = Decoder(
-            fusion_length=fused_vector_length,
-            output_size=output_size,
-            hidden_dim=decoder_h_dim,
-            num_layers=num_layers,
-            dropout=dropout,
-            decoder_mlp_activation=decoder_mlp_activation,
-            decoder_mlp_structure=decoder_mlp_structure,
-        )
-
-        # This module is used at the beginning to convert the input features
-        self.encoder = Encoder(
-            embedder=embedder,
-            input_size=input_size,
-            embedding_dim=embedding_dim,
-            encoder_h_dim=encoder_h_dim,
-            dropout=dropout,
-            num_layers=num_layers)
-
-        self.fusion = Fusion(pool_dim=fusion_pool_dim,
-                             hidden_size=fusion_hidden_dim)
-
-        encoder_decoder_mlp_structure = [encoder_h_dim, decoder_h_dim]
-        self.encoder_decoder_h = make_mlp(
-            layers=encoder_decoder_mlp_structure,
-            activation="Relu",
-            batch_normalization=True,
-        )
-
-        self._num_layers = num_layers
-        self._decoder_h_dim = decoder_h_dim
-        self._encoder_h_dim =encoder_h_dim
-
-    def forward(self, obs, obs_rel, context_features):
-        """
-        :param obs: should be of the shape (seq_length, batch, input_size)
-        :param obs_rel: should be of the shape (seq_length, batch, input_size)
-        :param context_features: should be of the shape (batch, 1024, 144)
-        :return: two items:
-            1. predicted_traj: the next absolute features for the observed trajectory: (batch, input_size)
-            2. predicted_traj_rel: the next relative features for the observed trajectory: (batch, input_size)
-        """
-        batch_size = obs_rel.shape[1]
-
-        states = self.encoder(obs_rel)
-        fused_features = self.fusion(obs, obs_rel, states[0], context_features)
-
-        decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
-        decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
-        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim)
-
-        decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
-        return decoder_output[0], decoder_output[1]
-
-
-||||||| parent of a9d089e... models finished
-=======
 class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
     def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size,
@@ -467,73 +331,6 @@ class GenerationUnit(nn.Module):
         return decoder_output[0], decoder_output[1]
 
 
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-=======
-class GenerationUnit(nn.Module):
-    """This class is responsible for generating just one frame"""
-    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size,
-                 decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 264):
-
-        super(GenerationUnit, self).__init__()
-
-        self.decoder = Decoder(
-            fusion_length=fused_vector_length,
-            output_size=input_size,
-            hidden_dim=decoder_h_dim,
-            num_layers=num_layers,
-            dropout=dropout,
-            decoder_mlp_activation=decoder_mlp_activation,
-            decoder_mlp_structure=decoder_mlp_structure,
-        )
-
-        # This module is used at the beginning to convert the input features
-        self.encoder = Encoder(
-            embedder=embedder,
-            input_size=input_size,
-            embedding_dim=embedding_dim,
-            encoder_h_dim=encoder_h_dim,
-            dropout=dropout,
-            num_layers=num_layers)
-
-        self.fusion = Fusion(pool_dim=fusion_pool_dim,
-                             hidden_size=fusion_hidden_dim)
-
-        encoder_decoder_mlp_structure = [encoder_h_dim, decoder_h_dim]
-        self.encoder_decoder_h = make_mlp(
-            layers=encoder_decoder_mlp_structure,
-            activation="Relu",
-            batch_normalization=True,
-        )
-
-        self._num_layers = num_layers
-        self._decoder_h_dim = decoder_h_dim
-        self._encoder_h_dim =encoder_h_dim
-
-    def forward(self, obs, obs_rel, context_features):
-        """
-        :param obs: should be of the shape (seq_length, batch, input_size)
-        :param obs_rel: should be of the shape (seq_length, batch, input_size)
-        :param context_features: should be of the shape (batch, 1024, 144)
-        :return: two items:
-            1. predicted_traj: the next absolute features for the observed trajectory: (batch, input_size)
-            2. predicted_traj_rel: the next relative features for the observed trajectory: (batch, input_size)
-        """
-        batch_size = obs_rel.shape[1]
-
-        states = self.encoder(obs_rel)
-        fused_features = self.fusion(obs, obs_rel, states[0], context_features)
-
-        decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
-        decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
-        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim)
-
-        decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
-        return decoder_output[0], decoder_output[1]
-
-
->>>>>>> origin/lazy-dataloader
 class TrajectoryGenerator(nn.Module):
     """The GenerationUnit will be used to forecast for sequence_length"""
     def __init__(self,
@@ -543,17 +340,6 @@ class TrajectoryGenerator(nn.Module):
                  decoder_h_dim: int = 64,
                  seq_length: int = 10,
                  input_size: int = 13,
-<<<<<<< HEAD
-<<<<<<< HEAD
-                 output_size:int = 7, 	# 3(transformation) + 4(rotation)
-||||||| parent of a9d089e... models finished
-                 decoder_hidden_dim: int = 64,
-=======
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-                 decoder_hidden_dim: int = 64,
-=======
->>>>>>> origin/lazy-dataloader
                  decoder_mlp_structure: list = [128],
                  decoder_mlp_activation: str = "Relu",
                  dropout: float = 0.0,
@@ -572,23 +358,6 @@ class TrajectoryGenerator(nn.Module):
             encoder_h_dim=encoder_h_dim,
             decoder_h_dim=decoder_h_dim,
             input_size=input_size,
-<<<<<<< HEAD
-<<<<<<< HEAD
-            output_size=output_size,
-||||||| parent of a9d089e... models finished
-            hidden_dim=decoder_hidden_dim,
-            num_layers=num_layers,
-            dropout=dropout,
-            decoder_mlp_activation=decoder_mlp_activation,
-=======
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-            hidden_dim=decoder_hidden_dim,
-            num_layers=num_layers,
-            dropout=dropout,
-            decoder_mlp_activation=decoder_mlp_activation,
-=======
->>>>>>> origin/lazy-dataloader
             decoder_mlp_structure=decoder_mlp_structure,
             decoder_mlp_activation=decoder_mlp_activation,
             dropout=dropout,
@@ -609,69 +378,6 @@ class TrajectoryGenerator(nn.Module):
         :return: final_prediction: shape (seq_length, batch, input_size)
         """
         batch_size = obs_traj.shape[1]
-<<<<<<< HEAD
-<<<<<<< HEAD
-        obs_length = obs_traj.shape[0]
-        final_prediction = [obs_traj]
-        final_prediction_rel = [obs_traj_rel]
-        gu_input = obs_traj.clone()
-        gu_input_rel = obs_traj_rel.clone()
-||||||| parent of a9d089e... models finished
-=======
-        obs_length = obs_traj.shape[0]
-        num_frames = frames.shape[0]
-        final_prediction = [obs_traj]
-        final_prediction_rel = [obs_traj_rel]
-        gu_input = obs_traj.clone()
-        gu_input_rel = obs_traj_rel.clone()
->>>>>>> a9d089e... models finished
-
-<<<<<<< HEAD
-        context_features = []
-        for i in range(obs_length):
-            context_features.append(self.context_features(frames[i]))
-||||||| parent of a9d089e... models finished
-        state_tuple = (
-            torch.zeros(self._num_layers, batch_size, self._hidden_size),
-            torch.zeros(self._num_layers, batch_size, self._hidden_size)
-        )
-=======
-        context_features = []
-        for i in range(num_frames):
-            context_features.append(self.context_features(frames[i]))
->>>>>>> a9d089e... models finished
-
-<<<<<<< HEAD
-        context_features_sum = sum(torch.Tensor(context_features))
-        # Should be of the shape (batch_size, 1024, 12 * 12)
-||||||| parent of a9d089e... models finished
-        """
-        Do what ever you want with the state_tuple[0] which stands for the hidden_state to be used
-            in prediction.
-        state_tuple[0] = ...
-        """
-=======
-        context_features_sum = sum(torch.Tensor(context_features))
-        # Should be of the shape (batch_size, 1024, 12 * 12)
-
-        for _ in range(self._seq_len):
-            predicted_features, predicted_features_rel = self.gu(obs=gu_input,
-                                                                 obs_traj_rel=gu_input_rel,
-                                                                 context_features=context_features_sum)
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-
-        state_tuple = (
-            torch.zeros(self._num_layers, batch_size, self._hidden_size),
-            torch.zeros(self._num_layers, batch_size, self._hidden_size)
-        )
-
-        """
-        Do what ever you want with the state_tuple[0] which stands for the hidden_state to be used
-            in prediction.
-        state_tuple[0] = ...
-        """
-=======
         obs_length = obs_traj.shape[0]
         num_frames = frames.shape[0]
         final_prediction = [obs_traj]
@@ -690,39 +396,11 @@ class TrajectoryGenerator(nn.Module):
             predicted_features, predicted_features_rel = self.gu(obs=gu_input,
                                                                  obs_traj_rel=gu_input_rel,
                                                                  context_features=context_features_sum)
->>>>>>> origin/lazy-dataloader
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-        for _ in range(self._seq_len):
-            predicted_features, predicted_features_rel = self.gu(obs=gu_input,
-                                                                 obs_traj_rel=gu_input_rel,
-                                                                 context_features=context_features_sum)
 
             # build the inputs for the next timestep
             final_prediction = torch.cat(final_prediction + predicted_features, dim=1)
             gu_input = final_prediction[:, -obs_length:, :]
             gu_input_rel = torch.cat(final_prediction_rel + predicted_features_rel, dim=1)[:, -obs_length:, :]
-||||||| parent of a9d089e... models finished
-        last_features = obs_traj[-1]
-        last_features_rel = obs_traj_rel[-1]
-        predicted_traj, _ = self.decoder(last_features, last_features_rel, state_tuple)
-=======
-            # build the inputs for the next timestep
-            final_prediction = torch.cat(final_prediction + predicted_features, dim=1)
-            gu_input = final_prediction[:, -obs_length:, :]
-            gu_input_rel = torch.cat(final_prediction_rel + predicted_features_rel, dim=1)[:, -obs_length:, :]
->>>>>>> a9d089e... models finished
-||||||| 3dd7b53
-        last_features = obs_traj[-1]
-        last_features_rel = obs_traj_rel[-1]
-        predicted_traj, _ = self.decoder(last_features, last_features_rel, state_tuple)
-=======
-            # build the inputs for the next timestep
-            final_prediction = torch.cat(final_prediction + predicted_features, dim=1)
-            gu_input = final_prediction[:, -obs_length:, :]
-            gu_input_rel = torch.cat(final_prediction_rel + predicted_features_rel, dim=1)[:, -obs_length:, :]
->>>>>>> origin/lazy-dataloader
 
         return final_prediction[:, -self._seq_len:, :]
 
