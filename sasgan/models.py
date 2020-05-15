@@ -206,7 +206,7 @@ class Fusion(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self,
-                 fusion_length: int = 264,
+                 fusion_length,
                  output_size: int = 7,
                  hidden_dim: int = 64,
                  num_layers: int = 1,
@@ -247,7 +247,6 @@ class Decoder(nn.Module):
 
         predicted_traj = last_features.clone()
         predicted_traj_rel = last_features_rel.clone()
-
         predicted_traj[:, :self._output_size] += curr_features_rel
         predicted_traj_rel[:, :self._output_size] = curr_features_rel
 
@@ -261,7 +260,7 @@ class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
     def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 264):
+                 fusion_hidden_dim, fused_vector_length: int = 289):
 
         super(GenerationUnit, self).__init__()
 
