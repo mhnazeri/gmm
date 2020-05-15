@@ -44,7 +44,7 @@ def _sample_annotations(nusc, instance):
         in "barrier debris pushable_pul trafficcone bicycle_rack"
         else 1
     )
-<<<<<<< HEAD
+
     if movable:
         while sample_annotation["next"] != "":
             annotation.append(
@@ -65,51 +65,6 @@ def _sample_annotations(nusc, instance):
             )
 
             sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
-||||||| parent of 67d4c00... fix extracting json segfault error
-    while sample_annotation["next"] != "":
-        annotation.append(
-            {
-                "translation": sample_annotation["translation"],
-                "rotation": sample_annotation["rotation"],
-                "size": sample_annotation["size"],
-                "visibility": sample_annotation["visibility_token"],
-                "category": sample_annotation["category_name"],
-                "instance_token": sample_annotation["instance_token"],
-                "sample_token": sample_annotation["sample_token"],
-                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
-                    "timestamp"
-                ],
-                "movable": movable,
-                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
-                if movable
-                else np.zeros(3, dtype=np.float32).tolist()
-            }
-        )
-
-        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
-=======
-    while sample_annotation["next"] != "":
-        annotation.append(
-            {
-                "translation": sample_annotation["translation"],
-                "rotation": sample_annotation["rotation"],
-                "size": sample_annotation["size"],
-                "visibility": sample_annotation["visibility_token"],
-                "category": sample_annotation["category_name"],
-                "instance_token": sample_annotation["instance_token"],
-                "sample_token": sample_annotation["sample_token"],
-                "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
-                    "timestamp"
-                ],
-                "movable": movable,
-                "velocity": nusc.box_velocity(sample_annotation["token"]).tolist()
-                if movable
-                else np.zeros(3, dtype=np.float32).tolist()
-            }
-        )
-
-        sample_annotation = nusc.get("sample_annotation", sample_annotation["next"])
->>>>>>> 67d4c00... fix extracting json segfault error
 
     return annotation
 
@@ -278,27 +233,6 @@ def box_velocity(nusc, sample_annotation_token: str, max_time_diff: float = 1.5)
         return np.array([0.0, 0.0, 0.0])
     else:
         return pos_diff / time_diff
-
-
-# implemented in dataloader
-# def backgraound_motion_detector(root: str, img_1: np.ndarray=None, img_2: np.ndarray = None)-> None:
-#     im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
-#     im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
-
-#     im = im / 255
-#     im_2 = im_2 / 255
-#     fig = plt.figure()
-#     a = fig.add_subplot(3, 1, 1)
-#     plt.imshow(im)
-#     # print("image 1: ", im.shape)
-#     # print("image 2: ", im_2.shape)
-#     fig.add_subplot(3, 1, 2)
-#     a.set_title("Frame 2")
-#     plt.imshow(im_2)
-#     a = fig.add_subplot(3, 1, 3)
-#     a.set_title("Motion")
-#     plt.imshow(im_2 - im, cmap="hot")
-#     plt.show()
 
 
 if __name__ == "__main__":
