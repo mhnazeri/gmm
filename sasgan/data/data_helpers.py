@@ -80,6 +80,7 @@ def create_feature_matrix_for_viz(file):
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
     num = 0
+    print("alksjdlkajsd")
     for key, start, stop in appears:
         for i in range(stop - start):
             agent_data = datum[-1][key][i]["translation"]
