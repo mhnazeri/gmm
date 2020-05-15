@@ -1,7 +1,10 @@
 """General Helpers functions that can be used everywhere"""
+import os
 import numpy as np
+from PIL import Image
 import ujson as json
 import torch
+from torchvision import transforms
 
 
 def read_file(file: str, feature: str = None):
@@ -103,6 +106,96 @@ def create_feature_matrix_for_viz(file):
     return datum, calibrated_features
 
 
+def save_train_samples(root_dir, save_dir):
+    """save each train sample on hdd"""
+    transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+    ])
+    json_files = os.path.join(root_dir, "exported_json_data")
+    image_files = os.path.join(root_dir, "nuScene-mini")
+    files = os.listdir(json_files)
+    files = [os.path.join(json_files, _path) for _path in files]
+    # check if save_dir exists, otherwise create one
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+
+    images = []
+    lidar = []
+    features = []
+    datums = []
+    # read the list 13 element at a time
+    num_features = [x for x in range(521) if x % 13 == 0]
+    start_stop = list(zip(num_features[:], num_features[1:]))
+    index = 0
+
+    for file in files:
+        # read lidar and camera data locations
+        lidar_address, camera_address = [], [] # read_file(file)
+        with open(file, "r") as f:
+            _data = json.load(f)
+
+        ego = _data[:-1]
+        lidar_address = []
+        camera_address = []
+
+        for i in range(len(ego)):
+            lidar_address.append(ego[i]["lidar"])
+            camera_address.append(ego[i]["camera"])
+        # for each file (scene), creates corresponding matrix
+        features = create_feature_matrix(file)
+        # create zero rows to reach the max agent number
+        # dummy = torch.zeros(max_agent - len(features), 520)
+        # features = torch.cat((features, dummy), 0)
+        data = {}
+        stamp = 0
+
+        while stamp < 27:
+            past = []
+            future = []
+            image = []
+
+            for j in range(4):
+                # 4 frames in the past
+                past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
+                # each frame has an image
+                image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
+
+            for j in range(4, 14):
+                # 10 frames in the future
+                future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
+
+            # calculate background motion by subtracting two consecutive images
+            image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
+            # we only need 7 first features (translation, rotation) for relative history
+            # a helper to slice out the 7 first features from each frame
+            rel_past = torch.cat(past, 1)
+            rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
+            rel_past = [past_2 - past_1 for past_1, past_2 in zip(rel_past[:], rel_past[1:])]
+
+            # if frame is at the beginning of a scene, add zero
+            if stamp == 0:
+                rel_past.insert(0, torch.zeros_like(past[0][:, :7]))
+                image.insert(0, torch.zeros_like(image[0]))
+            else:
+                rel_past.insert(0, (past[0] - datums[-1]["past"][-1])[:, :7])
+                image.insert(0, image[0] - datums[-1]["motion"][-1])
+
+            data["past"] = past
+            data["future"] = future
+
+            data["rel_past"] = rel_past
+            data["motion"] = image
+            datums.append(data)
+            # save data on hard
+            torch.save(data, os.path.join(save_dir, f"{index}.pt"))
+            index += 1
+            data = {}
+            stamp += 1
+
+
 if __name__ == "__main__":
-    data = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
-    print(data.shape)
+    # data = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
+    # print(data.shape)
+    save_train_samples(".", "train_data")
