@@ -226,7 +226,7 @@ if __name__ == "__main__":
                              shuffle=True,
                              drop_last=True)
 
-    # For testing different results for
+    # Change this for experimenting other latent dims
     latent_dim_list = [8, 11, 16, 32, 64]
 
     for latent_dim in latent_dim_list:

@@ -108,10 +108,11 @@ def main():
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
 
+    embedder = None
+    if bool(GENERATOR["use_cae_encoder"]):
+        embedder = cae_encoder
 
-
-
-"""
+    logger.info("building the GAN...")
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
@@ -161,16 +162,8 @@ def main():
 
     # Loading the checkpoint if existing
 
-
-
-
-    loading_path = checkpoint_path(DIRECTORIES["save_model"])
-=======
-
-
-
-    loading_path = checkpoint_path(DIRECTORIES["save_model"])
->>>>>>> a9d089e... models finished
+    save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
+    loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
         logger.info(f"Loading the main model...")
         loaded_dictionary = torch.load(loading_path)

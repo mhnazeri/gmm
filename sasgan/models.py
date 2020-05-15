@@ -223,18 +223,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self._num_layers = num_layers
-<<<<<<< HEAD
         self._output_size = output_size
-
-        hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
-        self.hidden2pos = make_mlp(
-            layers=hidden2pos_structure,
-            activation=decoder_mlp_activation,
-            dropout=dropout,
-            batch_normalization=False
-        )
-||||||| parent of a9d089e... models finished
-        self._use_cae_decoder = False
 
         hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
         self.hidden2pos = make_mlp(
@@ -270,7 +259,7 @@ class Decoder(nn.Module):
 # ________________________________________________________________________________
 class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
-    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size,
+    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
                  fusion_hidden_dim, fused_vector_length: int = 264):
 
@@ -278,7 +267,7 @@ class GenerationUnit(nn.Module):
 
         self.decoder = Decoder(
             fusion_length=fused_vector_length,
-            output_size=input_size,
+            output_size=output_size,
             hidden_dim=decoder_h_dim,
             num_layers=num_layers,
             dropout=dropout,
@@ -340,6 +329,7 @@ class TrajectoryGenerator(nn.Module):
                  decoder_h_dim: int = 64,
                  seq_length: int = 10,
                  input_size: int = 13,
+                 output_size:int = 7, 	# 3(transformation) + 4(rotation)
                  decoder_mlp_structure: list = [128],
                  decoder_mlp_activation: str = "Relu",
                  dropout: float = 0.0,
@@ -358,6 +348,7 @@ class TrajectoryGenerator(nn.Module):
             encoder_h_dim=encoder_h_dim,
             decoder_h_dim=decoder_h_dim,
             input_size=input_size,
+            output_size=output_size,
             decoder_mlp_structure=decoder_mlp_structure,
             decoder_mlp_activation=decoder_mlp_activation,
             dropout=dropout,
