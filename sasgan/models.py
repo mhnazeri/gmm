@@ -138,7 +138,7 @@ class Fusion(nn.Module):
         self.fuse_traj = nn.LSTM(input_size=92, hidden_size=hidden_size)
         self.fuse_context = nn.LSTM(input_size=144, hidden_size=hidden_size)
         self.fuse = nn.Sequential(nn.Linear(256, 256),
-                                    nn.MaxPool(kernel_size=2, stride=2),
+                                    nn.MaxPool2d(kernel_size=2, stride=2),
                                     nn.ReLU())
 
     def initiate_hidden(self, batch, sequence_len):
@@ -367,12 +367,12 @@ class TrajectoryGenerator(nn.Module):
         :param frames: Tensor of shape (4, 256, 256)
         :return: final_prediction: shape (seq_length, batch, input_size)
         """
-        batch_size = obs_traj.shape[1]
-        obs_length = obs_traj.shape[0]
+        batch_size = len(obs_traj[0])
+        obs_length = len(obs_traj)
         final_prediction = [obs_traj]
         final_prediction_rel = [obs_traj_rel]
-        gu_input = obs_traj.clone()
-        gu_input_rel = obs_traj_rel.clone()
+        gu_input = copy.deepcopy(obs_traj)
+        gu_input_rel = copy.deepcopy(obs_traj_rel)
 
         context_features = []
         for i in range(obs_length):
@@ -417,11 +417,6 @@ class TrajectoryDiscriminator(nn.Module):
 
         super(TrajectoryDiscriminator, self).__init__()
 
-        self.classifier = make_mlp(layers=[encoder_h_dim] + mlp_structure,
-                                   activation=mlp_activation,
-                                   dropout=dropout,
-                                   batch_normalization=batch_normalization)
-
         self.encoder = Encoder(
             embedder=embedder,
             input_size=input_size,
@@ -430,6 +425,11 @@ class TrajectoryDiscriminator(nn.Module):
             dropout=dropout,
             num_layers=num_layers
         )
+
+        self.classifier = make_mlp(layers=[encoder_h_dim] + mlp_structure,
+                                   activation=mlp_activation,
+                                   dropout=dropout,
+                                   batch_normalization=batch_normalization)
 
     def forward(self, traj):
         encoded_features = self.encoder(traj)

@@ -89,20 +89,11 @@ def get_cae():
 
 def main():
     cae_encoder, cae_decoder = get_cae()
-
     # By now the Encoder and the Decoder have been loaded or trained
-
-    image_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.Grayscale(),
-        transforms.ToTensor(),
-    ])
 
     logger.info("Preparing the dataloader for the main model...")
 
-    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"],
-                                   max_agent=int(TRAINING["max_agents"]),
-                                   transform=image_transform)
+    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"])
 
     data_loader = DataLoader(nuscenes_data,
                              batch_size=int(TRAINING["batch_size"]),
@@ -113,6 +104,7 @@ def main():
         embedder = cae_encoder
 
     logger.info("building the GAN...")
+
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
@@ -143,7 +135,6 @@ def main():
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
         dropout=float(DISCRIMINATOR["dropout"])
         )
-
     logger.info("Here is the discriminator")
     logger.info(d)
 
@@ -191,17 +182,19 @@ def main():
         g.train()
         d.train()
         for batch in data_loader:
-            d_steps_left = args.d_steps
-            g_steps_left = args.g_steps
+            d_steps_left = int(GENERATOR["steps"])
+            g_steps_left = int(DISCRIMINATOR["steps"])
 
-            true_labels = torch.ones(batch.shape[0], 1)
-            fake_labels = torch.zeros(batch.shape[0], 1)
+            batch_size = batch["past"][0].shape[0]
+
+            true_labels = torch.ones(batch_size, 1)
+            fake_labels = torch.zeros(batch_size, 1)
             while g_steps_left > 0:
                 ###################################################################
                 #                 training the generator
                 ###################################################################
                 logger.debug("Training the generator")
-                fake_traj = g(batch["past"], batch["past_rel"], batch["motion"])
+                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 fake_prediction = d(fake_traj)
 
                 g_loss = bce_loss(fake_prediction, true_labels)

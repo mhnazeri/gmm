@@ -83,7 +83,6 @@ def create_feature_matrix_for_viz(file):
     # sort by their number of visibilities in frames
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
     num = 0
-    print("alksjdlkajsd")
     for key, start, stop in appears:
         for i in range(stop - start):
             agent_data = datum[-1][key][i]["translation"]
@@ -183,10 +182,11 @@ def save_train_samples(root_dir, save_dir):
                 image.insert(0, image[0] - datums[-1]["motion"][-1])
 
             data["past"] = past
+            data["rel_past"] = rel_past
+
+            data["motion" ] = image
             data["future"] = future
 
-            data["rel_past"] = rel_past
-            data["motion"] = image
             datums.append(data)
             # save data on hard
             torch.save(data, os.path.join(save_dir, f"{index}.pt"))
