@@ -101,6 +101,7 @@ class ContextualFeatures(nn.Module):
             self.layer_5 = nn.Conv2d(in_channels=1024, out_channels=1024,
                                      kernel_size=3, stride=1, padding=1)
             # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
+
             #self-attention method proposed in self-attention gan Zhang et al.
             self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
                                  kernel_size=1, stride=1)

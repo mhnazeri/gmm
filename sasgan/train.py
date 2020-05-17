@@ -9,7 +9,7 @@ import os
 
 # Custom defined packages
 from data.loader import *
-from losses import bce_loss
+from losses import bce_loss, displacement_error
 from utils import *
 from torch.utils.data import DataLoader
 from cae import make_cae
@@ -93,12 +93,11 @@ def main():
 
     logger.info("Preparing the dataloader for the main model...")
 
-    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["nuscenes_json"])
+    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
 
     data_loader = DataLoader(nuscenes_data,
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True)
-
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         embedder = cae_encoder
@@ -241,9 +240,9 @@ def main():
             g.eval()
             d.eval()
 
-            ADE_loss = 0
-
             # Todo: Calculate the FDE and ADE in this section for validation
+            ADE_loss = displacement_error()
+
 
             validation_loss = ADE_loss.item()
 

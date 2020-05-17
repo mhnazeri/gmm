@@ -181,11 +181,11 @@ def save_train_samples(root_dir, save_dir):
                 rel_past.insert(0, (past[0] - datums[-1]["past"][-1])[:, :7])
                 image.insert(0, image[0] - datums[-1]["motion"][-1])
 
-            data["past"] = past
-            data["rel_past"] = rel_past
+            data["past"] = torch.cat(past, dim=0)
+            data["rel_past"] = torch.cat(rel_past, dim=0)
 
             data["motion" ] = image
-            data["future"] = future
+            data["future"] = torch.cat(future, dim=0)
 
             datums.append(data)
             # save data on hard
