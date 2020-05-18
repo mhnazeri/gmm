@@ -81,49 +81,71 @@ class ContextualFeatures(nn.Module):
     def __init__(self, model_arch: str="overfeat"):
         super(ContextualFeatures, self).__init__()
         if model_arch == "overfeat":
-            self.layer_1 = nn.Sequential(
+            self.net = nn.Sequential(
                 nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
-                                     out_channels=96),
-                nn.MaxPool2d(kernel_size=2, stride=2)
-                )
+                          out_channels=96),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=96, out_channels=256,
+                          kernel_size=5, stride=1),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=256, out_channels=512,
+                          kernel_size=3, stride=1, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=512, out_channels=1024,
+                          kernel_size=3, stride=1, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(in_channels=1024, out_channels=1024,
+                          kernel_size=3, stride=1, padding=1)
+                                     )
+
+        self.softmax = nn.Softmax2d()
+            # self.layer_1 = nn.Sequential(
+            #     nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
+            #                          out_channels=96),
+            #     nn.MaxPool2d(kernel_size=2, stride=2)
+            #     )
             # self.layer_1 = nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
             #                          out_channels=96)
             # self.layer_1_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
-            self.layer_2 = nn.Sequential(
-                nn.Conv2d(in_channels=96, out_channels=256,
-                                     kernel_size=5, stride=1),
-                nn.MaxPool2d(kernel_size=2, stride=2)
-                )
-            self.layer_3 = nn.Conv2d(in_channels=256, out_channels=512,
-                                     kernel_size=3, stride=1, padding=1)
-            self.layer_4 = nn.Conv2d(in_channels=512, out_channels=1024,
-                                     kernel_size=3, stride=1, padding=1)
-            self.layer_5 = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                     kernel_size=3, stride=1, padding=1)
+            # self.layer_2 = nn.Sequential(
+            #     nn.Conv2d(in_channels=96, out_channels=256,
+            #                          kernel_size=5, stride=1),
+            #     nn.MaxPool2d(kernel_size=2, stride=2)
+            #     )
+            # self.layer_3 = nn.Conv2d(in_channels=256, out_channels=512,
+            #                          kernel_size=3, stride=1, padding=1)
+            # self.layer_4 = nn.Conv2d(in_channels=512, out_channels=1024,
+            #                          kernel_size=3, stride=1, padding=1)
+            # self.layer_5 = nn.Conv2d(in_channels=1024, out_channels=1024,
+            #                          kernel_size=3, stride=1, padding=1)
             # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
 
-            #self-attention method proposed in self-attention gan Zhang et al.
-            self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=1, stride=1)
-            self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=1, stride=1)
-            self.frame_hx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=1, stride=1)
-            self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
-                                 kernel_size=1, stride=1)
+        #self-attention method proposed in self-attention gan Zhang et al.
+        self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                             kernel_size=1, stride=1)
+        self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                             kernel_size=1, stride=1)
+        self.frame_hx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                             kernel_size=1, stride=1)
+        self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
+                             kernel_size=1, stride=1)
 
     def forward(self, frame: torch.Tensor):
         batch = frame.size(0)
-        frame = self.layer_1(frame)
-        frame = self.layer_2(frame)
-        frame = self.layer_3(frame)
-        frame = self.layer_4(frame)
-        frame = self.layer_5(frame)
+        # forward pass through overfeat
+        frame = self.net(frame)
+        # frame = self.layer_1(frame)
+        # frame = self.layer_2(frame)
+        # frame = self.layer_3(frame)
+        # frame = self.layer_4(frame)
+        # frame = self.layer_5(frame)
         # self-attention gan
         frame_fx = self.frame_fx(frame)
         frame_gx = self.frame_gx(frame)
         frame_hx = self.frame_hx(frame)
-        frame = nn.Softmax2d(frame_fx.transpose_(3, 2).matmul(frame_gx))
+        frame = self.softmax(frame_fx.transpose_(3, 2).matmul(frame_gx))
         frame = frame_hx.matmul(frame)
         return self.frame_vx(frame).view(-1, 1024, 12 * 12)
 

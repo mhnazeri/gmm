@@ -108,7 +108,7 @@ def create_feature_matrix_for_viz(file):
 def save_train_samples(root_dir, save_dir):
     """save each train sample on hdd"""
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize((231, 231)),
         transforms.Grayscale(),
         transforms.ToTensor(),
     ])
