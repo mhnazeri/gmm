@@ -123,7 +123,7 @@ class ContextualFeatures(nn.Module):
         frame_fx = self.frame_fx(frame)
         frame_gx = self.frame_gx(frame)
         frame_hx = self.frame_hx(frame)
-        frame = nn.Softmax2d(frame_fx.transpose_(2, 1).matmul(frame_gx), dim=1)
+        frame = nn.Softmax2d(frame_fx.transpose_(3, 2).matmul(frame_gx))
         frame = frame_hx.matmul(frame)
         return self.frame_vx(frame).view(-1, 1024, 12 * 12)
 
