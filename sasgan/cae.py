@@ -217,6 +217,7 @@ if __name__ == "__main__":
     DIRECTORIES = config("Directories")
     CAE = config("CAE")
     GENERAL = config("System")
+    TRAINING = config("Training")
 
     root = DIRECTORIES["data_root"]
     cae_data = CAEDataset(root)
@@ -241,7 +242,7 @@ if __name__ == "__main__":
                  decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
                  dropout=float(CAE["dropout"]),
                  bn=bool(CAE["batch_normalization"]),
-                 input_size=int(CAE["input_size"]),
+                 input_size=int(TRAINING["input_size"]),
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),
