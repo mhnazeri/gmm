@@ -135,12 +135,19 @@ def make_cae(
         step = 0
         logger.debug("Done")
 
+    # Get the suitable device to run the model on
+    device = get_device(logger)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
     for epoch in range(start_epoch, start_epoch + iterations):
         logger.debug("Training the CAE")
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
-            # samples = (samples - samples.mean()) / samples.std()
+            samples = samples.to(device)
+            encoder.zero_grad()
+            decoder.zero_grad()
 
             # What are these for Mohammad??
             samples.requires_grad = True

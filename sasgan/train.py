@@ -24,7 +24,7 @@ from models import \
 parser = argparse.ArgumentParser()
 
 # Keep these
-parser.add_argument("--use_gpu", default=False, type=bool)
+parser.add_argument("--use_gpu", default=0, type=int)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
