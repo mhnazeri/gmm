@@ -11,6 +11,12 @@ from torch import nn
 import numpy as np
 import torch
 
+
+def init_weights(m):
+    if m.__class__.__name__ == "Linear":
+        nn.init.kaiming_uniform(m.weight)
+
+
 def get_device(logger):
     """
     Check if the running host have any GPUs available, if yes print the number of the available GPUs

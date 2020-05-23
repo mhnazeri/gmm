@@ -47,10 +47,6 @@ summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae"))
 #                          Some useful functions
 ##########################################################################################
 
-def init_weights(m):
-    if m.__class__.__name__ == "Linear":
-        nn.init.kaiming_uniform(m.weight)
-
 
 def get_cae():
     """
