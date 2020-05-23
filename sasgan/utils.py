@@ -5,7 +5,6 @@ import os
 import time
 import io
 import configparser
-import attrdict
 from typing import Dict
 from torch import nn
 import numpy as np
