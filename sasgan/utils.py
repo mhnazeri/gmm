@@ -11,18 +11,21 @@ from torch import nn
 import numpy as np
 import torch
 
-def get_the_number_of_GPUs(logger):
+def get_device(logger):
     """
     Check if the running host have any GPUs available, if yes print the number of the available GPUs
     :return: the number of available GPUs
     """
-    if torch.cuda.device_count() > 1:
-        logger.info("Number of the GPU: ", str(torch.cuda.device_count()))
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        logger.info(f"The number of GPUs available: {torch.cuda.device_count()}")
+        logger.info("Using GPU...")
 
     else:
-        logger.info("No GPU devices available")
+        device = torch.device("cpu")
+        logger.info("No available GPU, running on CPU...")
 
-    return torch.cuda.device_count()
+    return device
 
 def config(module_name: str=None) -> Dict[str, str]:
     """
@@ -92,12 +95,12 @@ def checkpoint_path(path):
     else:
         return None
 
-def get_tensor_type(args):
+def get_tensor_type():
     """
     To convert the datatype of all the tensors in the models
     :return: Float tensor datatype
     """
-    if args.use_gpu:
+    if torch.cuda.is_available():
         return torch.cuda.FloatTensor
     else:
         return torch.FloatTensor
