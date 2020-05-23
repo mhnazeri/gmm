@@ -114,6 +114,12 @@ def make_cae(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
 
+    logger.info("Hre is the encoder...")
+    logger.info(encoder)
+
+    logger.info("Hre is the decoder...")
+    logger.info(decoder)
+
     # Load the CAE if available
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
