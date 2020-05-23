@@ -163,6 +163,10 @@ def make_cae(
             outputs_encoder = encoder(samples)
 
             outputs = decoder(outputs_encoder)
+            print(outputs.get_device())
+            print(outputs_encoder.get_device())
+            print(samples.get_device())
+
             loss = cae_loss(outputs_encoder, outputs, samples)
             losses.append(loss.item())
 
