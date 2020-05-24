@@ -50,13 +50,14 @@ class Encoder(nn.Module):
         :return: A tensor of the shape (self.num_layers, batch, self.encoder_h_dim)
         """
         sequence_length = inputs.shape[0]
-        batch = inputs.shape[1]
+        batch_size = inputs.shape[1]
+
 
         # Check the integrity of the shapes
         logger.debug("The size of the inputs: " + str(inputs.size()))
 
         if state_tuple is None:
-            states = self.initiate_hidden(self.batch_size)
+            states = self.initiate_hidden(batch_size)
         else:
             states = state_tuple
 
@@ -65,7 +66,7 @@ class Encoder(nn.Module):
         embedded_features = self.embedder(embedder_inputs)
 
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
-        lstm_inputs = embedded_features.view(sequence_length, batch, self._embedding_dim)
+        lstm_inputs = embedded_features.view(sequence_length, batch_size, self._embedding_dim)
         _, states = self.lstm(lstm_inputs, states)
         return states
 
@@ -122,7 +123,7 @@ class ContextualFeatures(nn.Module):
             #                          kernel_size=3, stride=1, padding=1)
             # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        #self-attention method proposed in self-attention gan Zhang et al.
+        # self-attention method proposed in self-attention gan Zhang et al.
         self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
                              kernel_size=1, stride=1)
         self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
@@ -391,7 +392,7 @@ class TrajectoryGenerator(nn.Module):
         :return: final_prediction: shape (seq_length, batch, input_size)
         """
         batch_size = len(obs_traj[0])
-        obs_length = len(obs_traj)
+        obs_length = len(frames)
         final_prediction = [obs_traj]
         final_prediction_rel = [obs_traj_rel]
         gu_input = copy.deepcopy(obs_traj)
@@ -401,12 +402,12 @@ class TrajectoryGenerator(nn.Module):
         for i in range(obs_length):
             context_features.append(self.context_features(frames[i]))
 
-        context_features_sum = sum(torch.Tensor(context_features))
+        context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
         # Should be of the shape (batch_size, 1024, 12 * 12)
 
         for _ in range(self._seq_len):
             predicted_features, predicted_features_rel = self.gu(obs=gu_input,
-                                                                 obs_traj_rel=gu_input_rel,
+                                                                 obs_rel=gu_input_rel,
                                                                  context_features=context_features_sum)
 
             # build the inputs for the next timestep

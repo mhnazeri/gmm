@@ -73,13 +73,14 @@ def cae_loss(output_encoder, outputs, inputs, lamda=1e-4):
     :param lamda:
     :return:
     """
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     criterion = torch.nn.MSELoss()
     assert (
         outputs.shape == inputs.shape
     ), f"outputs.shape : {outputs.shape} != inputs.shape : {inputs.shape}"
 
     loss1 = criterion(outputs, inputs)
-    output_encoder.backward(torch.ones(output_encoder.size()), retain_graph=True)
+    output_encoder.backward(torch.ones(output_encoder.size()).to(device), retain_graph=True)
     inputs.grad.requires_grad = True
     # Frobenious norm, the square root of sum of all elements (square value)
     # in a jacobian matrix

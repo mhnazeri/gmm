@@ -109,9 +109,16 @@ def make_cae(
                               activation=activation,
                               batch_normalization=bn)
 
+
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
+
+    logger.info("Hre is the encoder...")
+    logger.info(encoder)
+
+    logger.info("Hre is the decoder...")
+    logger.info(decoder)
 
     # Load the CAE if available
     loading_path = checkpoint_path(save_dir)
@@ -134,13 +141,26 @@ def make_cae(
         best_loss = inf
         step = 0
         logger.debug("Done")
+        encoder.apply(init_weights)
+        decoder.apply(init_weights)
+
+    # Get the suitable device to run the model on
+    device = get_device(logger)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    tensor_type = get_tensor_type()
+    encoder.type(tensor_type).train()
+    decoder.type(tensor_type).train()
 
     for epoch in range(start_epoch, start_epoch + iterations):
         logger.debug("Training the CAE")
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
-            # samples = (samples - samples.mean()) / samples.std()
+            samples = samples.to(device)
+            encoder.zero_grad()
+            decoder.zero_grad()
 
             # What are these for Mohammad??
             samples.requires_grad = True
@@ -149,6 +169,7 @@ def make_cae(
             outputs_encoder = encoder(samples)
 
             outputs = decoder(outputs_encoder)
+
             loss = cae_loss(outputs_encoder, outputs, samples)
             losses.append(loss.item())
 
@@ -217,6 +238,7 @@ if __name__ == "__main__":
     DIRECTORIES = config("Directories")
     CAE = config("CAE")
     GENERAL = config("System")
+    TRAINING = config("Training")
 
     root = DIRECTORIES["data_root"]
     cae_data = CAEDataset(root)
@@ -241,7 +263,7 @@ if __name__ == "__main__":
                  decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
                  dropout=float(CAE["dropout"]),
                  bn=bool(CAE["batch_normalization"]),
-                 input_size=int(CAE["input_size"]),
+                 input_size=int(TRAINING["input_size"]),
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),

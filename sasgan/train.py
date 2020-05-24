@@ -24,7 +24,7 @@ from models import \
 parser = argparse.ArgumentParser()
 
 # Keep these
-parser.add_argument("--use_gpu", default=False, type=bool)
+parser.add_argument("--use_gpu", default=0, type=int)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,10 +46,6 @@ summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae"))
 ##########################################################################################
 #                          Some useful functions
 ##########################################################################################
-
-def init_weights(m):
-    if m.__class__.__name__ == "Linear":
-        nn.init.kaiming_uniform(m.weight)
 
 
 def get_cae():
