@@ -5,6 +5,7 @@ from PIL import Image
 import ujson as json
 import torch
 from torchvision import transforms
+from utils import config
 
 
 def read_file(file: str, feature: str = None):
@@ -105,7 +106,7 @@ def create_feature_matrix_for_viz(file):
     return datum, calibrated_features
 
 
-def save_train_samples(root_dir, save_dir):
+def save_train_samples(nuscenes_root, root_dir, save_dir):
     """save each train sample on hdd"""
     transform = transforms.Compose([
         transforms.Resize((231, 231)),
@@ -113,7 +114,7 @@ def save_train_samples(root_dir, save_dir):
         transforms.ToTensor(),
     ])
     json_files = os.path.join(root_dir, "exported_json_data")
-    image_files = os.path.join(root_dir, "nuScene-mini")
+    image_files = nuscenes_root
     files = os.listdir(json_files)
     files = [os.path.join(json_files, _path) for _path in files]
     # check if save_dir exists, otherwise create one
@@ -169,23 +170,23 @@ def save_train_samples(root_dir, save_dir):
             image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
             # we only need 7 first features (translation, rotation) for relative history
             # a helper to slice out the 7 first features from each frame
-            rel_past = torch.cat(past, 1)
-            rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
-            rel_past = [past_2 - past_1 for past_1, past_2 in zip(rel_past[:], rel_past[1:])]
+            # rel_past = torch.cat(past, 1)
+            # rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
+            rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
 
             # if frame is at the beginning of a scene, add zero
             if stamp == 0:
-                rel_past.insert(0, torch.zeros_like(past[0][:, :7]))
+                rel_past.insert(0, torch.zeros_like(past[0]))
                 image.insert(0, torch.zeros_like(image[0]))
             else:
-                rel_past.insert(0, (past[0] - datums[-1]["past"][-1])[:, :7])
+                rel_past.insert(0, (past[0] - datums[-1]["past"][-1]))
                 image.insert(0, image[0] - datums[-1]["motion"][-1])
 
-            data["past"] = torch.cat(past, dim=0)
-            data["rel_past"] = torch.cat(rel_past, dim=0)
+            data["past"] = torch.stack(past, dim=0)
+            data["rel_past"] = torch.stack(rel_past, dim=0)
 
             data["motion" ] = image
-            data["future"] = torch.cat(future, dim=0)
+            data["future"] = torch.stack(future, dim=0)
 
             datums.append(data)
             # save data on hard
@@ -198,4 +199,6 @@ def save_train_samples(root_dir, save_dir):
 if __name__ == "__main__":
     # data = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
     # print(data.shape)
-    save_train_samples(".", "train_data")
+    # nuscenes_root = config['Directories']['nuscenes']
+    nuscenes_root = "."
+    save_train_samples(nuscenes_root, ".", "train_data")

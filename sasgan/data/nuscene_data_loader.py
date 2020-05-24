@@ -245,6 +245,8 @@ if __name__ == "__main__":
         print(f"Convering scene {idx} from {len(nusc.scene)}")
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
+    print("Conversion is completed")
+
     # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")
     # sample_ann = nusc.get("sample_annotation", sample["anns"][0])
     # # print(sample_ann)
