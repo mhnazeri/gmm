@@ -29,13 +29,10 @@ class NuSceneDataset(Dataset):
         :param int idx: train data index
         :return: train data with index idx
         """
-        print(idx)
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         loaded_data = torch.load(self.files[idx])
-        print(loaded_data.shape)
-
         return loaded_data
 
 

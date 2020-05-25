@@ -109,15 +109,14 @@ def make_cae(
                               activation=activation,
                               batch_normalization=bn)
 
-
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
 
-    logger.info("Hre is the encoder...")
+    logger.info("Here is the encoder...")
     logger.info(encoder)
 
-    logger.info("Hre is the decoder...")
+    logger.info("Here is the decoder...")
     logger.info(decoder)
 
     # Load the CAE if available
@@ -135,7 +134,7 @@ def make_cae(
         logger.debug("Done")
 
     else:
-        logger.info("No saved model, initializing...")
+        logger.info("No saved model for CAE, initializing...")
         start_epoch = 0
         loss = tensor([0])
         best_loss = inf

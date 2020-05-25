@@ -93,7 +93,14 @@ def main():
 
     data_loader = DataLoader(nuscenes_data,
                              batch_size=int(TRAINING["batch_size"]),
-                             shuffle=True)
+                             shuffle=True,
+                             collate_fn=default_collate)
+
+    print("past:", next(iter(data_loader))["past"].shape)
+    print("rel_past:", next(iter(data_loader))["rel_past"].shape)
+    print("motion:", next(iter(data_loader))["motion"].shape)
+    print("future:", next(iter(data_loader))["future"].shape)
+
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         embedder = cae_encoder
@@ -138,7 +145,7 @@ def main():
     d.apply(init_weights)
 
     # Transfer the tensors to GPU if required
-    tensor_type = get_tensor_type(args)
+    tensor_type = get_tensor_type()
     g.type(tensor_type).train()
     d.type(tensor_type).train()
 
@@ -165,7 +172,7 @@ def main():
         logger.info(f"Done loading the model in {loading_path}")
 
     else:
-        logger.info(f"No saved checkpoint, Initializing...")
+        logger.info(f"No saved checkpoint for GAN, Initializing...")
         step = 0
         start_epoch = 0
         best_ADE_loss = np.inf

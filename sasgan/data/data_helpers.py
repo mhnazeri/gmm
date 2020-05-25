@@ -114,7 +114,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
         transforms.ToTensor(),
     ])
     json_files = os.path.join(root_dir, "exported_json_data")
-    image_files = os.getenv("nuscenes")
+    image_files = os.path.join(root_dir, "nuScene-mini")
     files = os.listdir(json_files)
     files = [os.path.join(json_files, _path) for _path in files]
     # check if save_dir exists, otherwise create one
@@ -185,7 +185,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
             data["past"] = torch.stack(past, dim=0)
             data["rel_past"] = torch.stack(rel_past, dim=0)
 
-            data["motion" ] = image
+            data["motion"] = image
             data["future"] = torch.stack(future, dim=0)
 
             datums.append(data)
@@ -200,5 +200,5 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
 if __name__ == "__main__":
     # data = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
     # print(data.shape)
-    save_train_samples(".", "train_data")
+    save_train_samples(".", ".", "train_data")
     print("Saving samples is comppleted!")

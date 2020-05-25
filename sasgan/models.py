@@ -134,7 +134,6 @@ class ContextualFeatures(nn.Module):
                              kernel_size=1, stride=1)
 
     def forward(self, frame: torch.Tensor):
-        batch = frame.size(0)
         # forward pass through overfeat
         frame = self.net(frame)
         # frame = self.layer_1(frame)

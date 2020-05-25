@@ -11,6 +11,17 @@ import numpy as np
 import torch
 
 
+def default_collate(batch):
+    elem = batch[0]
+    data = dict()
+    for key in elem.keys():
+        if key == "motion":
+            data[key] = torch.stack([torch.stack(item[key], dim=0) for item in batch], dim=0)
+        else:
+            data[key] = torch.cat([item[key] for item in batch], dim=1)
+    return data
+
+
 def init_weights(m):
     if m.__class__.__name__ == "Linear":
         nn.init.kaiming_uniform(m.weight)
