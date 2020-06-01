@@ -96,11 +96,6 @@ def main():
                              shuffle=True,
                              collate_fn=default_collate)
 
-    print("past:", next(iter(data_loader))["past"].shape)
-    print("rel_past:", next(iter(data_loader))["rel_past"].shape)
-    print("motion:", next(iter(data_loader))["motion"].shape)
-    print("future:", next(iter(data_loader))["future"].shape)
-
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         embedder = cae_encoder
@@ -187,15 +182,16 @@ def main():
             d_steps_left = int(GENERATOR["steps"])
             g_steps_left = int(DISCRIMINATOR["steps"])
 
-            batch_size = batch["past"][0].shape[0]
-
+            batch_size = batch["past"].shape[1]
             true_labels = torch.ones(batch_size, 1)
             fake_labels = torch.zeros(batch_size, 1)
+
             while g_steps_left > 0:
                 ###################################################################
                 #                 training the generator
                 ###################################################################
                 logger.debug("Training the generator")
+
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 fake_prediction = d(fake_traj)
 
@@ -232,9 +228,10 @@ def main():
 
             step += 1
 
-        if args.iterations > 0:
+        if TRAINING["epochs"] > 0:
+            epochs = TRAINING["epochs"]
             logger.info(
-                f"TRAINING[{epoch + 1}/{start_epoch + args.iterations}]\td_loss:{d_loss:.2f}\tg_loss:{g_loss:.2f}")
+                f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\td_loss:{d_loss:.2f}\tg_loss:{g_loss:.2f}")
 
             # Todo: show some qualitative results of the predictions
 

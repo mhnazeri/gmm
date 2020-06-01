@@ -67,7 +67,7 @@ class Encoder(nn.Module):
 
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
         lstm_inputs = embedded_features.view(sequence_length, batch_size, self._embedding_dim)
-        _, states = self.lstm(lstm_inputs, states)
+        _, states = self.encoder(lstm_inputs, states)
         return states
 
 
@@ -154,20 +154,23 @@ class ContextualFeatures(nn.Module):
 # ________________________________________________________________________________
 class Fusion(nn.Module):
     """Feature Pool and Fusion module"""
-    def __init__(self, pool_dim=256, hidden_size=128):
+    def __init__(self, pool_dim=256, hidden_size=128, noise_dim=16):
         super(Fusion, self).__init__()
         self.hidden_size = hidden_size
+        self._noise_dim = noise_dim
         # 3 modules that comprise the fusion
-        self.fuse_traj = nn.LSTM(input_size=92, hidden_size=hidden_size)
+        # self.fuse_traj = nn.LSTM(input_size=92, hidden_size=hidden_size)
         self.fuse_context = nn.LSTM(input_size=144, hidden_size=hidden_size)
-        self.fuse = nn.Sequential(nn.Linear(256, 256),
-                                    nn.MaxPool2d(kernel_size=2, stride=2),
+
+        # Todo: fix the dimension as input
+        self.fuse = nn.Sequential(nn.Linear(hidden_size * 2, 256),
+                                    # nn.MaxPool1d(kernel_size=2, stride=2),
                                     nn.ReLU())
 
-    def initiate_hidden(self, batch, sequence_len):
+    def initiate_hidden(self, batch):
         return (
-            torch.zeros(sequence_len, batch, self.hidden_size),
-            torch.zeros(sequence_len, batch, self.hidden_size)
+            torch.zeros(1, batch, self.hidden_size),
+            torch.zeros(1, batch, self.hidden_size)
         )
 
     def get_noise(self, shape, noise_type="gaussian"):
@@ -182,41 +185,44 @@ class Fusion(nn.Module):
         22 is for 2 seconds input (each second is 2 frame, each frame has 13
         features)
         args:
-            real_past: a matrix containing unmodified past locations (num_agents,7)
+            real_past: a matrix containing unmodified past locations (num_agents, 7)
             pool: modified past locations (num_agents, 64)
             context_feature: tensor of size=(1024, 144)
             i: desired agent number to forecast future, if -1, it will predict all the agents at the same time
         """
         batch = pool.size(1)
-        sequence_length = pool.size(0)
         if agent_idx == -1:
             agent = pool
-            noise = self.get_noise((agent.size(0), 5))
-        else:
-            agent = pool[agent_idx] # a vector of size 64
-            rel_past = rel_past[agent_idx] # vector of size 7
-            real_past = real_past[agent_idx]
-            noise = self.get_noise((5,))
+            noise = self.get_noise((agent.size(1), self._noise_dim))
+
+        # else:
+        #     agent = pool[agent_idx] # a vector of size 64
+        #     rel_past = rel_past[agent_idx] # vector of size 7
+        #     real_past = real_past[agent_idx]
+        #     noise = self.get_noise((5,))
 
         # concat relative_past with encoded features (vector of 28 + 64 = 92)
-        agent = torch.cat((rel_past, agent), 1)
-        agent = agent.view(-1, batch, 92)
+        # agent = torch.cat((rel_past, agent), 1)
+        # agent = agent.view(-1, batch, 92)
         # feed lidar stream to lstm for fusion
-        _, traj_hidden, _ = self.fuse_traj(agent,
-                                                self.initiate_hidden(batch, sequence_length))
+        # _, traj_hidden, _ = self.fuse_traj(agent,
+        #                                         self.initiate_hidden(batch, sequence_length))
 
-        # feed camera stream to lstm for fusion (1024, batch, 144)
         context_feature = torch.transpose(context_feature, 1, 0)
-        _, context_hidden, _ = self.fuse_context(context_feature,
-                                                self.initiate_hidden(batch, 1024))
+        _, context_hidden = self.fuse_context(context_feature,
+                                                self.initiate_hidden(batch))
 
         # fusing the hidden state of two streams together with an mlp
-        fused_features = torch.cat((traj_hidden, context_hidden), 1)
+        fused_features = torch.cat((agent[0], context_hidden[0][0]), 1)
         fused_features = self.fuse(fused_features)
         # concat all features (noise, real_past, fused_features) together to feed to the generator
         # dim: 5 + 28 + 256 = 289
+        # fused_features_hidden = torch.cat(
+        #     (noise, real_past, fused_features),
+        #     1)
+
         fused_features_hidden = torch.cat(
-            (noise, real_past, fused_features),
+            (noise, fused_features),
             1)
         return fused_features_hidden
 
@@ -264,8 +270,7 @@ class Decoder(nn.Module):
         :param state_tuple: A tuple of two states as the initial state of the LSTM where the first item
             contains the required info from the past, both in the shape (num_layers, batch_size, embedding_dim)
         """
-        decoder_input = self.embedder(fused_features).unsqueeze(0)
-        decoder_output, state_tuple = self.decoder(decoder_input, state_tuple)
+        decoder_output, state_tuple = self.decoder(fused_features.unsqueeze(0), state_tuple)
         curr_features_rel = self.hidden2pos(decoder_output[0])
 
         predicted_traj = last_features.clone()
@@ -283,7 +288,7 @@ class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
     def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 289):
+                 fusion_hidden_dim, fused_vector_length: int = 272):
 
         super(GenerationUnit, self).__init__()
 
@@ -318,7 +323,9 @@ class GenerationUnit(nn.Module):
 
         self._num_layers = num_layers
         self._decoder_h_dim = decoder_h_dim
-        self._encoder_h_dim =encoder_h_dim
+        self._encoder_h_dim = encoder_h_dim
+        self.__input_size = input_size
+        self.__embedding_dim = embedding_dim
 
     def forward(self, obs, obs_rel, context_features):
         """
@@ -330,9 +337,12 @@ class GenerationUnit(nn.Module):
             2. predicted_traj_rel: the next relative features for the observed trajectory: (batch, input_size)
         """
         batch_size = obs_rel.shape[1]
-
         states = self.encoder(obs_rel)
-        fused_features = self.fusion(obs, obs_rel, states[0], context_features)
+
+        fused_features = self.fusion(obs,
+                                     obs_rel,
+                                     states[0],
+                                     context_features)
 
         decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
         decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
@@ -387,19 +397,19 @@ class TrajectoryGenerator(nn.Module):
         """
         :param obs_traj: shape (obs_length, batch, inputs_size)
         :param obs_traj_rel: shape (obs_length, batch, inputs_size)
-        :param frames: Tensor of shape (4, 256, 256)
+        :param frames: Tensor of shape (4, 1, 256, 256)
         :return: final_prediction: shape (seq_length, batch, input_size)
         """
-        batch_size = len(obs_traj[0])
-        obs_length = len(frames)
-        final_prediction = [obs_traj]
-        final_prediction_rel = [obs_traj_rel]
+        batch_size = obs_traj.shape[1]
+        obs_length = obs_traj.shape[0]
+        final_prediction = obs_traj
+        final_prediction_rel = obs_traj_rel
         gu_input = copy.deepcopy(obs_traj)
         gu_input_rel = copy.deepcopy(obs_traj_rel)
 
         context_features = []
         for i in range(obs_length):
-            context_features.append(self.context_features(frames[i]))
+            context_features.append(self.context_features(frames[:, i]))
 
         context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
         # Should be of the shape (batch_size, 1024, 12 * 12)
@@ -410,11 +420,12 @@ class TrajectoryGenerator(nn.Module):
                                                                  context_features=context_features_sum)
 
             # build the inputs for the next timestep
-            final_prediction = torch.cat(final_prediction + predicted_features, dim=1)
-            gu_input = final_prediction[:, -obs_length:, :]
-            gu_input_rel = torch.cat(final_prediction_rel + predicted_features_rel, dim=1)[:, -obs_length:, :]
+            final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
+            gu_input = final_prediction[-obs_length:]
+            final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
+            gu_input_rel = final_prediction_rel[-obs_length:]
 
-        return final_prediction[:, -self._seq_len:, :]
+        return final_prediction[-self._seq_len:]
 
 ##################################################################################
 #                               GAN Discriminator
@@ -456,7 +467,7 @@ class TrajectoryDiscriminator(nn.Module):
 
     def forward(self, traj):
         encoded_features = self.encoder(traj)
-        scores = self.classifier(encoded_features[0])
+        scores = self.classifier(encoded_features[0][0])
         return scores
 
 if __name__ == '__main__':
