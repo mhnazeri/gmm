@@ -2,8 +2,7 @@ import torch
 
 
 def bce_loss(input, target):
-    """
-    According to the usage of binary CE on top of sigmoid, it could be summarized as below
+    """According to the usage of binary CE on top of sigmoid, it could be summarized as below
     :param input: The input tensor of shape [Batch_size]
     :param target: The target tensor of shape [Btach_size]
     :return: The binary cross entropy loss
@@ -16,13 +15,11 @@ def bce_loss(input, target):
 
 def displacement_error(pred_traj, pred_traj_gt, consider_ped=None):
     """
-    Input:
-    - pred_traj: Tensor of shape (seq_len, batch, 2). Predicted trajectory.
-    - pred_traj_gt: Tensor of shape (seq_len, batch, 2). Ground truth
+    :param pred_traj: Tensor of shape (seq_len, batch, 2). Predicted trajectory.
+    :param pred_traj_gt: Tensor of shape (seq_len, batch, 2). Ground truth
     predictions.
-    - consider_ped: Tensor of shape (batch)
-    Output:
-    - tuple: the average loss over batch,
+    :param consider_ped: Tensor of shape (batch)
+    :return tuple: the average loss over batch,
              the loss tensor to be further used in qualitative results
     """
     seq_len, _, _ = pred_traj.size()
@@ -38,12 +35,10 @@ def displacement_error(pred_traj, pred_traj_gt, consider_ped=None):
 
 def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None):
     """
-    Input:
-    - pred_pos: Tensor of shape (batch, 2). Predicted last pos.
-    - pred_pos_gt: Tensor of shape (batch, 2). Groudtruth last pos
-    - consider_ped: Tensor of shape (batch)
-    Output:
-    - tuple: the average loss over batch,
+    :param pred_pos: Tensor of shape (batch, 2). Predicted last pos.
+    :param pred_pos_gt: Tensor of shape (batch, 2). Groudtruth last pos
+    :param consider_ped: Tensor of shape (batch)
+    :return tuple: the average loss over batch,
              the loss tensor to be further used in qualitative results
     """
     loss = pred_pos_gt - pred_pos
@@ -57,13 +52,12 @@ def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None):
 
 
 def cae_loss(output_encoder, outputs, inputs, lamda=1e-4):
-    """
-    Will be described by mohammad
-    :param output_encoder:
-    :param outputs:
-    :param inputs:
-    :param lamda:
-    :return:
+    """Contractive auto-encoder loss
+    :param output_encoder: output of encoder module
+    :param outputs: output of decoder module
+    :param inputs: ground-truth values
+    :param lamda: coefficient for Frobenious norm
+    :return: torch.IntTensor: conractive loss, torch.IntTensor of size 1
     """
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     criterion = torch.nn.MSELoss()
