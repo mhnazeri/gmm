@@ -1,6 +1,7 @@
 """This module is responsible for loading of NuScene dataset
 """
 import os
+import argparse
 import logging
 import ujson as json
 import numpy as np
@@ -235,7 +236,10 @@ def box_velocity(nusc, sample_annotation_token: str, max_time_diff: float = 1.5)
 
 
 if __name__ == "__main__":
-    root = "nuScene-mini"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nuscenes', dest='nuscenes', action='store_true', help='set nuscenes directory')
+    arguments = parser.parse_args()
+    root = arguments.nuscenes
     nusc = load_dataset(root, verbose=False)
     print(f"Total scenes: {len(nusc.scene)}")
     print("Start converting to json")

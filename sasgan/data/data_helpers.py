@@ -1,5 +1,6 @@
 """General Helpers functions that can be used everywhere"""
 import os
+import argparse
 import numpy as np
 from PIL import Image
 import ujson as json
@@ -197,6 +198,9 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
 
 
 if __name__ == "__main__":
-    nuscenes_root = "."
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nuscenes', dest='nuscenes', action='store_true', help='set nuscenes directory')
+    arguments = parser.parse_args()
+    nuscenes_root = arguments.nuscenes
     save_train_samples(nuscenes_root, ".", "train_data")
     print("Saving samples is comppleted!")
