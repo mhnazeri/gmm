@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 import numpy as np
 import ujson as json
 from PIL import Image
@@ -6,7 +7,6 @@ import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 from data.data_helpers import create_feature_matrix
-# from nuscenes.utils.data_classes import LidarPointCloud
 
 
 class NuSceneDataset(Dataset):
@@ -14,16 +14,20 @@ class NuSceneDataset(Dataset):
     each sample is a dictionary with keys: past, rel_past, future, motion
     """
 
-    def __init__(self,  root_dir: str):
+    def __init__(self,  root_dir: str, test: bool = False):
         """str root_dir: train_data root directory"""
-        train_data = os.path.join(root_dir, "train_data")
-        self.files = os.listdir(train_data)
-        self.files = [os.path.join(train_data, _path) for _path in self.files]
+        if test:
+            data = os.path.join(root_dir, "test_data")
+        else:
+            data = os.path.join(root_dir, "train_data")
+
+        self.files = os.listdir(data)
+        self.files = [os.path.join(data, _path) for _path in self.files]
 
     def __len__(self):
         return len(self.files)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Dict:
         """
         return desired train data with index idx.
         :param int idx: train data index
