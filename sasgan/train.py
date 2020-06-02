@@ -253,9 +253,9 @@ def main():
         if int(TRAINING["epochs"]) > 0:
             epochs = int(TRAINING["epochs"])
             logger.info(
-                f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\t"
-                f"d_loss:{mean(d_losses):.2f}\t\t"
-                f"g_loss:{mean(g_losses):.2f}\t\t"
+                f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\t\t"
+                f"d_loss:{mean(d_losses):4.2f}\t\t"
+                f"g_loss:{mean(g_losses):4.2f}\t\t"
                 f"ADE_loss:{ADE_loss:8.2f}\t\t"
                 f"FDE_loss:{FDE_loss:8.2f}")
 
