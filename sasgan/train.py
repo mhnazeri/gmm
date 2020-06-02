@@ -176,8 +176,8 @@ def main():
             g_steps_left = int(DISCRIMINATOR["steps"])
 
             batch_size = batch["past"].shape[1]
-            true_labels = torch.ones(batch_size, 1)
-            fake_labels = torch.zeros(batch_size, 1)
+            true_labels = torch.ones(batch_size, 1).to(device)
+            fake_labels = torch.zeros(batch_size, 1).to(device)
 
             logger.debug(f"step {step} started!")
 
