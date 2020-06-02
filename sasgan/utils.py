@@ -23,7 +23,6 @@ def default_collate(batch):
                 stacked_list.append(stacked_images)
 
             data[key] = torch.cat(stacked_list, dim=0)
-            # print(data[key].shape)
 
         else:
             data[key] = torch.cat([item[key] for item in batch], dim=1)

@@ -80,6 +80,7 @@ def make_cae(
         learning_rate: float = 0.001,
         save_every_d_epochs: int = 50,
         ignore_first_epochs: int = 300,
+        device=None
         ):
     """
     The following function returns the required cae to be further used in the next sections of the model
@@ -143,8 +144,11 @@ def make_cae(
         encoder.apply(init_weights)
         decoder.apply(init_weights)
 
+
     # Get the suitable device to run the model on
-    device = get_device(logger)
+    if device is None:
+        device = get_device(logger)
+
     encoder = encoder.to(device)
     decoder = decoder.to(device)
 
@@ -195,7 +199,7 @@ def make_cae(
           3. after the final iteration
         """
 
-        if best_loss <= mean(losses) or \
+        if (best_loss <= mean(losses) and epoch > ignore_first_epochs) or \
                 (epoch + 1) % save_every_d_epochs == 0 or \
                 (epoch + 1) == start_epoch + iterations:
             logger.info("Saving the model....")

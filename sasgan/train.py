@@ -9,10 +9,11 @@ import os
 
 # Custom defined packages
 from data.loader import *
-from losses import bce_loss, displacement_error
+from losses import bce_loss, displacement_error, final_displacement_error
 from utils import *
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from cae import make_cae
+from numpy import inf, mean
 from models import \
     TrajectoryGenerator, \
     TrajectoryDiscriminator
@@ -43,12 +44,7 @@ summary_writer_generator = SummaryWriter(os.path.join(DIRECTORIES["log"], "gener
 summary_writer_discriminator = SummaryWriter(os.path.join(DIRECTORIES["log"], "discriminator"))
 summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae"))
 
-##########################################################################################
-#                          Some useful functions
-##########################################################################################
-
-
-def get_cae():
+def get_cae(device):
     """
     Implemented to load the dataset and run the make cae method to either train or load the cae
     :return: The trained encoder and decoder with frozen weights
@@ -76,7 +72,8 @@ def get_cae():
                                         activation=str(CAE["activation"]),
                                         learning_rate=float(CAE["learning_rate"]),
                                         save_every_d_epochs=int(CAE["save_every_d_epochs"]),
-                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]))
+                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]),
+                                        device=device)
 
 
     logger.info("Done training/loading the CAE!")
@@ -84,7 +81,13 @@ def get_cae():
 
 
 def main():
-    cae_encoder, cae_decoder = get_cae()
+    # Get the device type
+    if args.use_gpu:
+        device = get_device(logger)
+    else:
+        device = torch.device("cpu")
+
+    cae_encoder, cae_decoder = get_cae(device)
     # By now the Encoder and the Decoder have been loaded or trained
 
     logger.info("Preparing the dataloader for the main model...")
@@ -132,6 +135,7 @@ def main():
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
         dropout=float(DISCRIMINATOR["dropout"])
         )
+
     logger.info("Here is the discriminator")
     logger.info(d)
 
@@ -139,10 +143,14 @@ def main():
     g.apply(init_weights)
     d.apply(init_weights)
 
-    # Transfer the tensors to GPU if required
+    # Transfer the models to gpu
+    g.to(device)
+    d.to(device)
+
+    # Change the tensor types to GPU if neccesary
     tensor_type = get_tensor_type()
-    g.type(tensor_type).train()
-    d.type(tensor_type).train()
+    g.type(tensor_type)
+    d.type(tensor_type)
 
     # defining the loss and optimizers for generator and discriminator
     d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]))
@@ -170,14 +178,16 @@ def main():
         logger.info(f"No saved checkpoint for GAN, Initializing...")
         step = 0
         start_epoch = 0
-        best_ADE_loss = np.inf
-        d_loss = np.inf
-        g_loss = np.inf
+        best_ADE_loss = inf
+        d_loss = inf
+        g_loss = inf
 
     logger.debug("Training the model")
     for epoch in range(start_epoch, start_epoch + int(TRAINING["epochs"])):
         g.train()
         d.train()
+        g_losses = []
+        d_losses = []
         for batch in data_loader:
             d_steps_left = int(GENERATOR["steps"])
             g_steps_left = int(DISCRIMINATOR["steps"])
@@ -185,6 +195,14 @@ def main():
             batch_size = batch["past"].shape[1]
             true_labels = torch.ones(batch_size, 1)
             fake_labels = torch.zeros(batch_size, 1)
+
+            logger.debug(f"step {step} started!")
+
+            for key in batch.keys():
+                batch[key].to(device)
+
+            g.zero_grad()
+            d.zero_grad()
 
             while g_steps_left > 0:
                 ###################################################################
@@ -196,6 +214,7 @@ def main():
                 fake_prediction = d(fake_traj)
 
                 g_loss = bce_loss(fake_prediction, true_labels)
+                g_losses.append(g_loss.item())
 
                 summary_writer_generator.add_scalar("Loss", g_loss, step)
 
@@ -218,6 +237,7 @@ def main():
                 fake_loss = bce_loss(fake_prediction, fake_labels)
 
                 d_loss = fake_loss + real_loss
+                d_losses.append(d_loss.item())
 
                 summary_writer_discriminator.add_scalar("Loss", d_loss, step)
 
@@ -226,28 +246,34 @@ def main():
                 d_optimizer.step()
                 d_steps_left -= 1
 
+            logger.debug(f"step {step} finished!")
             step += 1
-
-        if TRAINING["epochs"] > 0:
-            epochs = TRAINING["epochs"]
-            logger.info(
-                f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\td_loss:{d_loss:.2f}\tg_loss:{g_loss:.2f}")
-
-            # Todo: show some qualitative results of the predictions
 
         with torch.no_grad():
             logger.debug("Evaluating the model")
             g.eval()
             d.eval()
 
-            # Todo: Calculate the FDE and ADE in this section for validation
-            ADE_loss = displacement_error()
+            fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+            ADE_loss = displacement_error(fake_traj, batch["future"]).item()
+            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1]).item()
 
+            # Todo: show some qualitative results of the predictions to be shown in tensorboard
 
-            validation_loss = ADE_loss.item()
+        if int(TRAINING["epochs"]) > 0:
+            epochs = int(TRAINING["epochs"])
+            logger.info(
+                f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\t"
+                f"d_loss:{mean(d_losses):.2f}\t\t"
+                f"g_loss:{mean(g_losses):.2f}\t\t"
+                f"ADE_loss:{ADE_loss:.2f}\t\t"
+                f"FDE_loss:{FDE_loss:.2f}")
+
+        summary_writer_general.add_scalar("ADE_loss", ADE_loss, epoch)
+        summary_writer_general.add_scalar("FDE_loss", FDE_loss, epoch)
 
         # check if it is time to save a checkpoint of the model
-        if validation_loss <= best_ADE_loss or \
+        if (ADE_loss <= best_ADE_loss and epoch > int(TRAINING["ignore_first_epochs"])) or \
                 (epoch + 1) % int(TRAINING["save_every_d_steps"]) == 0 or \
                 (epoch + 1) == start_epoch + int(TRAINING["epochs"]):
             logger.info("Saving the model....")
@@ -262,11 +288,13 @@ def main():
                 "current_d_loss": d_loss,
                 "current_g_loss": g_loss,
             }
-            if validation_loss <= best_ADE_loss and epoch > args.ignore_first_iterations:
-                best_ADE_loss = validation_loss
+            if ADE_loss <= best_ADE_loss and epoch > int(TRAINING["ignore_first_epochs"]):
+                best_ADE_loss = ADE_loss
                 torch.save(checkpoint, save_dir + "/best.pt")
 
-            if (epoch + 1) % args.save_every_d_epochs == 0 or (epoch + 1) == start_epoch + args.iterations:
+            if (epoch + 1) % int(TRAINING["save_every_d_steps"]) == 0 or \
+                    (epoch + 1) == start_epoch + int(TRAINING["epochs"]):
+
                 torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
 if __name__ == '__main__':

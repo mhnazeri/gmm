@@ -24,7 +24,7 @@ def displacement_error(pred_traj, pred_traj_gt, consider_ped=None, mode='sum'):
     - consider_ped: Tensor of shape (batch)
     - mode: Can be one of sum, raw
     Output:
-    - loss: gives the eculidian displacement error
+    - loss: gives the eculidean displacement error
     """
     seq_len, _, _ = pred_traj.size()
     loss = pred_traj_gt.permute(1, 0, 2) - pred_traj.permute(1, 0, 2)
@@ -46,7 +46,7 @@ def final_displacement_error(
     COPIED FROM SOICAL GAN CODE
     Input:
     - pred_pos: Tensor of shape (batch, 2). Predicted last pos.
-    - pred_pos_gt: Tensor of shape (seq_len, batch, 2). Groud truth
+    - pred_pos_gt: Tensor of shape (batch, 2). Groud truth
     last pos
     - consider_ped: Tensor of shape (batch)
     Output:
