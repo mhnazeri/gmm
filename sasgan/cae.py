@@ -80,7 +80,6 @@ def make_cae(
         learning_rate: float = 0.001,
         save_every_d_epochs: int = 50,
         ignore_first_epochs: int = 300,
-        device=None
         ):
     """
     The following function returns the required cae to be further used in the next sections of the model
@@ -144,11 +143,8 @@ def make_cae(
         encoder.apply(init_weights)
         decoder.apply(init_weights)
 
-
     # Get the suitable device to run the model on
-    if device is None:
-        device = get_device(logger)
-
+    device = get_device(logger)
     encoder = encoder.to(device)
     decoder = decoder.to(device)
 

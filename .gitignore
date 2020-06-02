@@ -5,7 +5,7 @@ sasgan/data/train_data
 sasgan/data/test_data
 sasgan/models_state
 .idea
-#*/logs/*
+*/logs/*
 */save/*
 *.mp4
 *.json
@@ -17,6 +17,7 @@ sasgan/models_state
 __pycache__/
 *.py[cod]
 *$py.class
+.gitignore
 
 # C extensions
 *.so
