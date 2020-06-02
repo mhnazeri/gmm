@@ -232,9 +232,6 @@ def main():
 
             logger.debug(f"step {step} finished!")
             step += 1
-            if step % 10:
-                break
-
 
         ##########################################################################################
         #                            evaluating the trained model
@@ -254,9 +251,9 @@ def main():
             epochs = int(TRAINING["epochs"])
             logger.info(
                 f"TRAINING[{(epoch + 1):4}/{(start_epoch + epochs):4}]\t"
-                f"d_loss:{mean(d_losses):5.2f}\t\t"
-                f"g_loss:{mean(g_losses):5.2f}\t\t"
-                f"ADE_loss:{ADE_loss:8.2f}\t\t"
+                f"d_loss:{mean(d_losses):5.2f}\t"
+                f"g_loss:{mean(g_losses):5.2f}\t"
+                f"ADE_loss:{ADE_loss:8.2f}\t"
                 f"FDE_loss:{FDE_loss:8.2f}")
 
         summary_writer_validation.add_scalar("ADE_loss", ADE_loss, epoch)
