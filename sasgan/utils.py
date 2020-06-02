@@ -41,12 +41,14 @@ def get_device(logger, use_gpu=True):
     """
     if torch.cuda.is_available() and use_gpu:
         device = torch.device("cuda:0")
-        logger.info(f"The number of GPUs available: {torch.cuda.device_count()}")
-        logger.info("Using GPU...")
+        if "main" in logger.name:
+            logger.info(f"The number of GPUs available: {torch.cuda.device_count()}")
+            logger.info("Using GPU...")
 
     else:
         device = torch.device("cpu")
-        logger.info("No available GPU, running on CPU...")
+        if "main" in logger.name:
+            logger.info("No available GPU, running on CPU...")
 
     return device
 
