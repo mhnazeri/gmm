@@ -114,16 +114,16 @@ def make_cae(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
 
-    logger.info("Here is the encoder...")
-    logger.info(encoder)
+    logger.debug("Here is the encoder...")
+    logger.debug(encoder)
 
-    logger.info("Here is the decoder...")
-    logger.info(decoder)
+    logger.debug("Here is the decoder...")
+    logger.debug(decoder)
 
     # Load the CAE if available
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
-        logger.info(f"Loading the model inf {loading_path}...")
+        logger.info(f"Loading the model in {loading_path}...")
         saving_dictionary = load(loading_path)
         encoder.load_state_dict(saving_dictionary["encoder"])
         decoder.load_state_dict(saving_dictionary["decoder"])
@@ -202,7 +202,6 @@ def make_cae(
         if (best_loss <= mean(losses) and epoch > ignore_first_epochs) or \
                 (epoch + 1) % save_every_d_epochs == 0 or \
                 (epoch + 1) == start_epoch + iterations:
-            logger.info("Saving the model....")
             checkpoint = {
                 "epoch": epoch,
                 "step": step,
@@ -213,10 +212,12 @@ def make_cae(
                 "loss": loss,
             }
             if best_loss <= mean(losses) and epoch > ignore_first_epochs:
+                logger.info("Saving the model(lowest ADE loss)...")
                 best_loss = mean(losses)
                 save(checkpoint, save_dir + "/best.pt")
 
             else:
+                logger.info(f"Saving the model(intervals)...")
                 save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
     """

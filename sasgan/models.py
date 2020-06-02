@@ -229,10 +229,6 @@ class Fusion(nn.Module):
 ##################################################################################
 #                                    Decoder
 # ________________________________________________________________________________
-# Todo: for later
-#       1. implement the pooling every timestep mechanism ---> Done
-#       2. Not sure about adding for all the features ----> Done
-
 class Decoder(nn.Module):
     def __init__(self,
                  fusion_length,
@@ -397,7 +393,7 @@ class TrajectoryGenerator(nn.Module):
         """
         :param obs_traj: shape (obs_length, batch, inputs_size)
         :param obs_traj_rel: shape (obs_length, batch, inputs_size)
-        :param frames: Tensor of shape (4, 1, 256, 256)
+        :param frames: Tensor of shape (batch, 4, 1, 256, 256)
         :return: final_prediction: shape (seq_length, batch, input_size)
         """
         batch_size = obs_traj.shape[1]
