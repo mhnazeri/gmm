@@ -253,8 +253,8 @@ def main():
                 f"TRAINING[{epoch + 1}/{start_epoch + epochs}]\t"
                 f"d_loss:{mean(d_losses):.2f}\t\t"
                 f"g_loss:{mean(g_losses):.2f}\t\t"
-                f"ADE_loss:{ADE_loss:.2f}\t\t"
-                f"FDE_loss:{FDE_loss:.2f}")
+                f"ADE_loss:{ADE_loss:6.2f}\t\t"
+                f"FDE_loss:{FDE_loss:6.2f}")
 
         summary_writer_validation.add_scalar("ADE_loss", ADE_loss, epoch)
         summary_writer_validation.add_scalar("FDE_loss", FDE_loss, epoch)
