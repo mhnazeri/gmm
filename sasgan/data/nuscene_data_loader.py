@@ -1,6 +1,7 @@
 """This module is responsible for loading of NuScene dataset
 """
 import os
+import argparse
 import logging
 import ujson as json
 import numpy as np
@@ -59,7 +60,6 @@ def _sample_annotations(nusc, instance):
                     "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
                         "timestamp"
                     ],
-                    "movable": movable,
                     "velocity": box_velocity(nusc, sample_annotation["token"]).tolist()
                 }
             )
@@ -127,11 +127,11 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     if path:
         if os.path.exists(path):
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list, indent=4))
+                f.write(json.dumps(info_list, indent=4, escape_forward_slashes=False))
         else:
             os.mkdir(path)
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list, indent=4))
+                f.write(json.dumps(info_list, indent=4, escape_forward_slashes=False))
 
     else:
         return info_list
@@ -236,7 +236,10 @@ def box_velocity(nusc, sample_annotation_token: str, max_time_diff: float = 1.5)
 
 
 if __name__ == "__main__":
-    root = "nuScene-mini"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nuscenes', dest='nuscenes', action='store_true', help='set nuscenes directory')
+    arguments = parser.parse_args()
+    root = arguments.nuscenes
     nusc = load_dataset(root, verbose=False)
     print(f"Total scenes: {len(nusc.scene)}")
     print("Start converting to json")

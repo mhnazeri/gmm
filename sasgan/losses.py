@@ -14,17 +14,16 @@ def bce_loss(input, target):
     return loss.mean()
 
 
-def displacement_error(pred_traj, pred_traj_gt, consider_ped=None, mode='sum'):
+def displacement_error(pred_traj, pred_traj_gt, consider_ped=None):
     """
-    COPIED FROM SOICAL GAN CODE
     Input:
     - pred_traj: Tensor of shape (seq_len, batch, 2). Predicted trajectory.
     - pred_traj_gt: Tensor of shape (seq_len, batch, 2). Ground truth
     predictions.
     - consider_ped: Tensor of shape (batch)
-    - mode: Can be one of sum, raw
     Output:
-    - loss: gives the eculidian displacement error
+    - tuple: the average loss over batch,
+             the loss tensor to be further used in qualitative results
     """
     seq_len, _, _ = pred_traj.size()
     loss = pred_traj_gt.permute(1, 0, 2) - pred_traj.permute(1, 0, 2)
@@ -33,24 +32,19 @@ def displacement_error(pred_traj, pred_traj_gt, consider_ped=None, mode='sum'):
         loss = torch.sqrt(loss.sum(dim=2)).sum(dim=1) * consider_ped
     else:
         loss = torch.sqrt(loss.sum(dim=2)).sum(dim=1)
-    if mode == 'sum':
-        return torch.sum(loss)
-    elif mode == 'raw':
-        return loss
+
+    return torch.sum(loss) / pred_traj.shape[1], loss
 
 
-def final_displacement_error(
-    pred_pos, pred_pos_gt, consider_ped=None, mode='sum'
-):
+def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None):
     """
-    COPIED FROM SOICAL GAN CODE
     Input:
     - pred_pos: Tensor of shape (batch, 2). Predicted last pos.
-    - pred_pos_gt: Tensor of shape (seq_len, batch, 2). Groud truth
-    last pos
+    - pred_pos_gt: Tensor of shape (batch, 2). Groudtruth last pos
     - consider_ped: Tensor of shape (batch)
     Output:
-    - loss: gives the eculidian displacement error
+    - tuple: the average loss over batch,
+             the loss tensor to be further used in qualitative results
     """
     loss = pred_pos_gt - pred_pos
     loss = loss**2
@@ -58,10 +52,8 @@ def final_displacement_error(
         loss = torch.sqrt(loss.sum(dim=1)) * consider_ped
     else:
         loss = torch.sqrt(loss.sum(dim=1))
-    if mode == 'raw':
-        return loss
-    else:
-        return torch.sum(loss)
+
+    return torch.sum(loss) / pred_pos.shape[1], loss
 
 
 def cae_loss(output_encoder, outputs, inputs, lamda=1e-4):
