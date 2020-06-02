@@ -8,11 +8,9 @@ import logging
 from data.loader import CAEDataset
 import copy
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 # The logger used for debugging
 logger = logging.getLogger(__name__)
-
+device = get_device(logger)
 
 ##################################################################################
 #                                    Encoder
@@ -40,8 +38,8 @@ class Encoder(nn.Module):
 
     def initiate_hidden(self, batch_size):
         return (
-            torch.zeros(self._num_layers, batch_size, self._hidden_size),
-            torch.zeros(self._num_layers, batch_size, self._hidden_size)
+            torch.zeros(self._num_layers, batch_size, self._hidden_size).to(device),
+            torch.zeros(self._num_layers, batch_size, self._hidden_size).to(device)
         )
 
     def forward(self, inputs, state_tuple=None):
@@ -169,13 +167,13 @@ class Fusion(nn.Module):
 
     def initiate_hidden(self, batch):
         return (
-            torch.zeros(1, batch, self.hidden_size),
-            torch.zeros(1, batch, self.hidden_size)
+            torch.zeros(1, batch, self.hidden_size).to(device),
+            torch.zeros(1, batch, self.hidden_size).to(device)
         )
 
     def get_noise(self, shape, noise_type="gaussian"):
         if noise_type == 'gaussian':
-            return torch.randn(*shape)
+            return torch.randn(*shape).to(device)
         elif noise_type == 'uniform':
             return torch.rand(*shape).sub_(0.5).mul_(2.0)
         raise ValueError('Unrecognized noise type "%s"' % noise_type)
@@ -342,7 +340,7 @@ class GenerationUnit(nn.Module):
 
         decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
         decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
-        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim)
+        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim).to(device)
 
         decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
         return decoder_output[0], decoder_output[1]

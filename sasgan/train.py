@@ -22,14 +22,8 @@ from models import \
 ##########################################################################################
 #                          Getting the required configuration
 ##########################################################################################
-parser = argparse.ArgumentParser()
-
-# Keep these
-parser.add_argument("--use_gpu", default=1, type=int)
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-args = parser.parse_args()
 
 # Getting the configuration for training
 GENERAL = config("System")
@@ -134,14 +128,14 @@ def main():
     d.apply(init_weights)
 
     # Get the device type
-    device = get_device(logger, args.use_gpu)
+    device = get_device(logger)
 
     # Transfer the models to gpu
     g.to(device)
     d.to(device)
 
     # Change the tensor types to GPU if neccessary
-    tensor_type = get_tensor_type(args.use_gpu)
+    tensor_type = get_tensor_type()
     g.type(tensor_type)
     d.type(tensor_type)
 
