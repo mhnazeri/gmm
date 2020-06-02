@@ -44,7 +44,7 @@ summary_writer_generator = SummaryWriter(os.path.join(DIRECTORIES["log"], "gener
 summary_writer_discriminator = SummaryWriter(os.path.join(DIRECTORIES["log"], "discriminator"))
 summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae"))
 
-def get_cae(device):
+def get_cae():
     """
     Implemented to load the dataset and run the make cae method to either train or load the cae
     :return: The trained encoder and decoder with frozen weights
@@ -72,21 +72,13 @@ def get_cae(device):
                                         activation=str(CAE["activation"]),
                                         learning_rate=float(CAE["learning_rate"]),
                                         save_every_d_epochs=int(CAE["save_every_d_epochs"]),
-                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]),
-                                        device=device)
+                                        ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 
     return cae_encoder, cae_decoder
 
 
 def main():
-    # Get the device type
-    if args.use_gpu:
-        device = get_device(logger)
-    else:
-        logger.info("Forced to use cpu as device...")
-        device = torch.device("cpu")
-
-    cae_encoder, cae_decoder = get_cae(device)
+    cae_encoder, cae_decoder = get_cae()
     logger.info("Preparing the dataloader for the main model...")
 
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
@@ -141,12 +133,15 @@ def main():
     g.apply(init_weights)
     d.apply(init_weights)
 
+    # Get the device type
+    device = get_device(logger, args.use_gpu)
+
     # Transfer the models to gpu
     g.to(device)
     d.to(device)
 
-    # Change the tensor types to GPU if neccesary
-    tensor_type = get_tensor_type()
+    # Change the tensor types to GPU if neccessary
+    tensor_type = get_tensor_type(args.use_gpu)
     g.type(tensor_type)
     d.type(tensor_type)
 
@@ -155,7 +150,6 @@ def main():
     g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]))
 
     # Loading the checkpoint if existing
-
     save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
@@ -193,8 +187,9 @@ def main():
 
             logger.debug(f"step {step} started!")
 
+            # Transferring the input to the suitable device
             for key in batch.keys():
-                batch[key].to(device)
+                batch[key] = batch[key].to(device)
 
             g.zero_grad()
             d.zero_grad()
@@ -253,8 +248,8 @@ def main():
             d.eval()
 
             fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-            ADE_loss, _ = displacement_error(fake_traj, batch["future"]).item()
-            FDE_loss, _ = final_displacement_error(fake_traj[-1], batch["future"][-1]).item()
+            ADE_loss = displacement_error(fake_traj, batch["future"])[0].item()
+            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1])[0].item()
 
             # Todo: show some qualitative results of the predictions to be shown in tensorboard
 

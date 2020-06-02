@@ -31,15 +31,15 @@ def default_collate(batch):
 
 def init_weights(m):
     if m.__class__.__name__ == "Linear":
-        nn.init.kaiming_uniform(m.weight)
+        nn.init.kaiming_uniform_(m.weight)
 
 
-def get_device(logger):
+def get_device(logger, use_gpu=True):
     """
     Check if the running host have any GPUs available, if yes print the number of the available GPUs
     :return: the number of available GPUs
     """
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and use_gpu:
         device = torch.device("cuda:0")
         logger.info(f"The number of GPUs available: {torch.cuda.device_count()}")
         logger.info("Using GPU...")
@@ -49,6 +49,7 @@ def get_device(logger):
         logger.info("No available GPU, running on CPU...")
 
     return device
+
 
 def config(module_name: str=None) -> Dict[str, str]:
     """
@@ -118,12 +119,13 @@ def checkpoint_path(path):
     else:
         return None
 
-def get_tensor_type():
+
+def get_tensor_type(use_gpu=True):
     """
     To convert the datatype of all the tensors in the models
     :return: Float tensor datatype
     """
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and use_gpu:
         return torch.cuda.FloatTensor
     else:
         return torch.FloatTensor
@@ -158,8 +160,10 @@ def make_mlp(layers: list,
 
     return nn.Sequential(*nn_layers)
 
+
 def convert_str_to_list(string_list):
     return [int(item.strip()) for item in string_list.strip('][').split(",")]
+
 
 if __name__ == '__main__':
     cae_config = config("CAE")
