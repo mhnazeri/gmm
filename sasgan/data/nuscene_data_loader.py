@@ -59,7 +59,6 @@ def _sample_annotations(nusc, instance):
                     "timestamp": nusc.get("sample", sample_annotation["sample_token"])[
                         "timestamp"
                     ],
-                    "movable": movable,
                     "velocity": box_velocity(nusc, sample_annotation["token"]).tolist()
                 }
             )
@@ -127,11 +126,11 @@ def extract_scene_data_as_json(nusc, scene_idx, path=None):
     if path:
         if os.path.exists(path):
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list, indent=4))
+                f.write(json.dumps(info_list, indent=4, escape_forward_slashes=False))
         else:
             os.mkdir(path)
             with open(os.path.join(path, name) + ".json", "w") as f:
-                f.write(json.dumps(info_list, indent=4))
+                f.write(json.dumps(info_list, indent=4, escape_forward_slashes=False))
 
     else:
         return info_list
