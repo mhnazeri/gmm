@@ -107,12 +107,22 @@ def create_feature_matrix_for_viz(file):
     return datum, calibrated_features
 
 
-def save_train_samples(nuscenes_root, root_dir, save_dir):
+def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
     """save each train sample on hdd"""
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=0, std=1),
-    ])
+    if arch == "overfeat":
+        transform = transforms.Compose([
+            transforms.Resize((231, 231)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=0, std=1),
+        ])
+    elif arch == "vgg":
+        transform = transforms.Compose([
+            transforms.Resize((384, 384)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=0, std=1),
+        ])
+
     json_files = os.path.join(root_dir, "exported_json_data")
     image_files = nuscenes_root
     files = os.listdir(json_files)
@@ -239,7 +249,8 @@ if __name__ == "__main__":
     parser.add_argument('--dest', dest='dest', type=str, default="test_data", help='destination directory')
     parser.add_argument('--portion', dest='portion', type=float, default=0.15, help='what percentage of values should be used for testing')
     parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
-    arguments = parser.parse_args()
-    save_train_samples(arguments.nuscenes, ".", "train_data")
+    parser.add_argument('--arch', dest='arch', type=str, default="overfeat", help='feature extractor model architecture')
+    args = parser.parse_args()
+    save_train_samples(args.nuscenes, ".", "train_data")
     print("Saving samples is completed!")
-    move_samples(arguments.source, arguments.dest, arguments.portion, arguments.seed)
+    move_samples(args.source, args.dest, args.portion, args.seed, args.arch)

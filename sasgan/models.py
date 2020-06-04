@@ -82,11 +82,6 @@ class ContextualFeatures(nn.Module):
         super(ContextualFeatures, self).__init__()
 
         if model_arch == "overfeat":
-            self.transform = transforms.Compose([
-                transforms.Resize((231, 231)),
-                transforms.Grayscale()
-            ])
-
             self.net = nn.Sequential(
                 nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
                           out_channels=96),
@@ -107,10 +102,6 @@ class ContextualFeatures(nn.Module):
                                      )
 
         elif model_arch == "vgg":
-            self.transform = transforms.Compose([
-                transforms.Resize((384, 384))
-            ])
-
             vgg = torchvision.models.vgg11(pretrained=pretrained).features
             for i, layer in enumerate(vgg.children()):
                 if isinstance(layer, nn.MaxPool2d):
@@ -141,8 +132,6 @@ class ContextualFeatures(nn.Module):
                              kernel_size=1, stride=1)
 
     def forward(self, frame: torch.Tensor):
-        # not to capture transformations in computation graph
-        frame.data = self.transform(frame.data)
         # forward pass through feature_extractor
         frame = self.net(frame)
         # self-attention gan
@@ -467,11 +456,11 @@ class TrajectoryDiscriminator(nn.Module):
 
         # add spectral normalization for linear layer of the discriminator
         for i, layer in enumerate(self.encoder.children()):
-            if isintance(layer, nn.Linear):
+            if isinstance(layer, nn.Linear):
                 self.encoder[i] = nn.utils.spectral_norm(layer)
 
         for i, layer in enumerate(self.classifier.children()):
-            if isintance(layer, nn.Linear):
+            if isinstance(layer, nn.Linear):
                 self.classifier[i] = nn.utils.spectral_norm(layer)
 
     def forward(self, traj):
