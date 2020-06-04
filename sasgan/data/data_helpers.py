@@ -78,7 +78,7 @@ def create_feature_matrix_for_viz(file):
     datum, timestamps, appears = read_file(file, "timestamp")
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
-    agents = np.zeros((len(datum[-1]), 120))
+    agents = np.zeros((len(datum[-1]), 80))
     calibrated_features = []
     # appears = (agent_num, start, stop)
     # sort by their number of visibilities in frames
@@ -86,20 +86,20 @@ def create_feature_matrix_for_viz(file):
     num = 0
     for key, start, stop in appears:
         for i in range(stop - start):
-            agent_data = datum[-1][key][i]["translation"]
-            agents[num, (start * 3) + (i * 3): (start + 1) * 3 + (i * 3)] = np.array(agent_data)
+            agent_data = datum[-1][key][i]["translation"][:2]
+            agents[num, (start * 2) + (i * 2): (start + 1) * 2 + (i * 2)] = np.array(agent_data)
         num += 1
 
     for id in range(num_frames):
         # ego vehicle location
-        ego.extend(datum[id]["ego_pose_translation"])
-        calibrated_features.append((datum[id]["calibrated_translation"],
-                                    datum[id]["calibrated_rotation"]))
+        ego.extend(datum[id]["ego_pose_translation"][:2])
+        calibrated_features.append((datum[id]["calibrated_translation"][:2],
+                                    datum[id]["calibrated_rotation"][:2]))
     else:
         for i in range(40 - num_frames):
-            ego.extend(torch.zeros(3, dtype=torch.float32))
+            ego.extend(torch.zeros(2, dtype=torch.float32))
 
-    ego = np.array(ego).reshape(-1, 120)
+    ego = np.array(ego).reshape(-1, 80)
     agents = agents
     datum = np.concatenate((ego, agents), 0)
 
@@ -111,6 +111,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
     transform = transforms.Compose([
         transforms.Resize((231, 231)),
         transforms.Grayscale(),
+        transforms.Normalize(mean=0, std=1)
         transforms.ToTensor(),
     ])
     json_files = os.path.join(root_dir, "exported_json_data")

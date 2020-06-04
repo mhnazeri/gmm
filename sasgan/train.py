@@ -172,8 +172,8 @@ def main():
         g_losses = []
         d_losses = []
         for batch in data_loader:
-            d_steps_left = int(GENERATOR["steps"])
-            g_steps_left = int(DISCRIMINATOR["steps"])
+            d_steps_left = int(DISCRIMINATOR["steps"])
+            g_steps_left = int(GENERATOR["steps"])
 
             batch_size = batch["past"].shape[1]
             true_labels = torch.ones(batch_size, 1).to(device)

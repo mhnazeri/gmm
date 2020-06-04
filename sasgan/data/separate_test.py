@@ -1,5 +1,6 @@
 import os
 import random
+import argparse
 from typing import Tuple
 
 
@@ -40,4 +41,10 @@ def move_samples(source: str, dest: str, portion: float, seed: int = 42):
 
 
 if __name__ == "__main__":
-    move_samples("train_data", "test_data", 0.2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--source', dest='source', action='store_true', default="train_data", help='source directory')
+    parser.add_argument('--dest', dest='dest', action='store_true', default="test_data", help='destination directory')
+    parser.add_argument('--portion', dest='portion', action='store_true', help='what percentage of values should be used for testing')
+    parser.add_argument('--seed', dest='seed', action='store_true', default="42", help='random seed')
+    arguments = parser.parse_args()
+    move_samples(arguments.source, arguments.dest, arguments.portion, arguments.seed)

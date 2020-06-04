@@ -83,18 +83,18 @@ class ContextualFeatures(nn.Module):
             self.net = nn.Sequential(
                 nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
                           out_channels=96),
-                nn.MaxPool2d(kernel_size=2, stride=2),
-                nn.ReLU(),
+                nn.AvgPool2d(kernel_size=2, stride=2),
+                nn.LeakyReLU(),
                 nn.Conv2d(in_channels=96, out_channels=256,
                           kernel_size=5, stride=1),
-                nn.MaxPool2d(kernel_size=2, stride=2),
-                nn.ReLU(),
+                nn.AvgPool2d(kernel_size=2, stride=2),
+                nn.LeakyReLU(),
                 nn.Conv2d(in_channels=256, out_channels=512,
                           kernel_size=3, stride=1, padding=1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Conv2d(in_channels=512, out_channels=1024,
                           kernel_size=3, stride=1, padding=1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Conv2d(in_channels=1024, out_channels=1024,
                           kernel_size=3, stride=1, padding=1)
                                      )
@@ -458,6 +458,15 @@ class TrajectoryDiscriminator(nn.Module):
                                    activation=mlp_activation,
                                    dropout=dropout,
                                    batch_normalization=batch_normalization)
+
+        # add spectral normalization for linear layer of the discriminator
+        for i, layer in enumerate(self.encoder.children()):
+            if isintance(layer, nn.Linear):
+                self.encoder[i] = nn.utils.spectral_norm(layer)
+
+        for i, layer in enumerate(self.classifier.children()):
+            if isintance(layer, nn.Linear):
+                self.classifier[i] = nn.utils.spectral_norm(layer)
 
     def forward(self, traj):
         encoded_features = self.encoder(traj)

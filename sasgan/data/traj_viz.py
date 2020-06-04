@@ -11,11 +11,10 @@ from data_helpers import create_feature_matrix_for_viz
 
 
 # Defining Global variables
-# matplotlib.use( 'tkagg' )
 fig, axes = plt.subplots(figsize=(18, 9))
 view = np.eye(4)
 ln, = plt.plot([], [], "b.", markersize=1)
-nusc = NuScenes(version="v1.0-mini", dataroot="nuScene-mini",verbose=False)
+nusc = NuScenes(version="v1.0-mini", dataroot="nuScene-mini", verbose=False)
 
 
 def sample_extractor(nusc, idx_scene):
@@ -60,9 +59,9 @@ def update(*frames):
         for i in range(1, len(lidar)):
             # print(feature_matrix.shape)
             # Move box to ego vehicle coord system
-            agent_past = data["past"][i] - data["past"][0]
-            agent_future = data["future"][i] - data["future"][0]
-            agent_now = data["now"][i] - data["now"][0]
+            agent_past = data["past"][i] - calibre[0]
+            agent_future = data["future"][i] - calibre[0]
+            agent_now = data["now"][i] - calibre[0]
 
             agent_past -= np.tile(np.array(agent_now), 2)
             agent_future -= np.tile(np.array(agent_now), 3)
@@ -75,11 +74,11 @@ def update(*frames):
             # agent_future -= np.tile(np.array(calibre[0]), 3)
             print(agent_past)
             # plotting ego
-            axes.scatter(data["past"][0][::3], data["past"][0][1::3], marker='d', label="Past", color="blue")
-            axes.scatter(data["future"][0][::3], data["future"][0][1::3], marker='s', label="Future", color="green")
+            axes.scatter(data["past"][0][::2], data["past"][0][1::2], marker='d', label="Past", color="blue")
+            axes.scatter(data["future"][0][::2], data["future"][0][1::2], marker='s', label="Future", color="green")
             # plotting other agents
-            axes.scatter(agent_past[::3], agent_past[1::3], marker='d', label="Past", color="blue")
-            axes.scatter(agent_future[::3], agent_future[1::3], marker='s', label="Future", color="green")
+            axes.scatter(agent_past[::2], agent_past[1::2], marker='d', label="Past", color="blue")
+            axes.scatter(agent_future[::2], agent_future[1::2], marker='s', label="Future", color="green")
 
             # axes_limit = 53
             # axes.set_xlim(-axes_limit, axes_limit)
@@ -157,12 +156,12 @@ def _get_color(category_name: str):
         return 255, 0, 255  # Magenta
 
 
-def render_scene_lidar(root, nusc, idx_scene=0, save_path=None, blit=False):
+def render_scene_lidar(nusc, idx_scene=0, save_path=None, blit=False):
     scene_data = sample_extractor(nusc, idx_scene)
     feature_matrix, calibrated_features = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
     lidar = []
     num_features = list(range(121))
-    start_stop = list(zip(num_features[::3], num_features[3::3]))
+    start_stop = list(zip(num_features[::2], num_features[2::2]))
 
     for idx in range(2, 37):
         data = {}
@@ -192,9 +191,4 @@ def render_scene_lidar(root, nusc, idx_scene=0, save_path=None, blit=False):
 
 if __name__ == "__main__":
     # feature_matrix = create_feature_matrix_for_viz("exported_json_data/scene-" + "0061.json").numpy()
-    render_scene_lidar("", nusc, save_path="./")
-
-    # feature_matrix = zip(feature_matrix[0][: 6],
-    #                      feature_matrix[0][6: 21])
-    # feature_matrix = list(feature_matrix)
-    # print(len(feature_matrix[0]))
+    render_scene_lidar(nusc, 1, save_path="./")
