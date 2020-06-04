@@ -124,7 +124,6 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
         ])
 
     json_files = os.path.join(root_dir, "exported_json_data")
-    image_files = nuscenes_root
     files = os.listdir(json_files)
     files = [os.path.join(json_files, _path) for _path in files]
     # check if save_dir exists, otherwise create one
@@ -170,7 +169,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
                 # 4 frames in the past
                 past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
                 # each frame has an image
-                image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
+                image.append(transform(Image.open(os.path.join(nuscenes_root, camera_address[stamp + j]))))
 
             for j in range(4, 14):
                 # 10 frames in the future
@@ -244,13 +243,13 @@ def move_samples(source: str, dest: str, portion: float, seed: int = 42):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('nuscenes', dest='nuscenes', type=str, help='set nuscenes directory')
+    parser.add_argument('nuscenes', type=str, help='set nuscenes directory')
     parser.add_argument('--source', dest='source', type=str, default="train_data", help='source directory')
     parser.add_argument('--dest', dest='dest', type=str, default="test_data", help='destination directory')
     parser.add_argument('--portion', dest='portion', type=float, default=0.15, help='what percentage of values should be used for testing')
     parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
     parser.add_argument('--arch', dest='arch', type=str, default="overfeat", help='feature extractor model architecture')
     args = parser.parse_args()
-    save_train_samples(args.nuscenes, ".", "train_data")
+    save_train_samples(args.nuscenes, ".", args.source)
     print("Saving samples is completed!")
     move_samples(args.source, args.dest, args.portion, args.seed, args.arch)
