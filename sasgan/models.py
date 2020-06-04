@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchvision
 import numpy as np
 import sys
 import os
@@ -77,75 +78,84 @@ class ContextualFeatures(nn.Module):
         Networks that can be used for feature extraction are:
             overfeat: returned matrix is 1024*12*12
     """
-    def __init__(self, model_arch: str="overfeat"):
+    def __init__(self, model_arch: str="overfeat", pretrained: bool=False):
         super(ContextualFeatures, self).__init__()
+
         if model_arch == "overfeat":
+            self.transform = transforms.Compose([
+                transforms.Resize((231, 231)),
+                transforms.Grayscale(),
+                transforms.Normalize(mean=0, std=1),
+                transforms.ToTensor(),
+            ])
+
             self.net = nn.Sequential(
                 nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
                           out_channels=96),
                 nn.AvgPool2d(kernel_size=2, stride=2),
-                nn.LeakyReLU(),
+                nn.LeakyReLU(inplace=True),
                 nn.Conv2d(in_channels=96, out_channels=256,
                           kernel_size=5, stride=1),
                 nn.AvgPool2d(kernel_size=2, stride=2),
-                nn.LeakyReLU(),
+                nn.LeakyReLU(inplace=True),
                 nn.Conv2d(in_channels=256, out_channels=512,
                           kernel_size=3, stride=1, padding=1),
-                nn.LeakyReLU(),
-                nn.Conv2d(in_channels=512, out_channels=1024,
+                nn.LeakyReLU(inplace=True),
+                nn.Conv2d(in_channels=512, out_channels=512,
                           kernel_size=3, stride=1, padding=1),
-                nn.LeakyReLU(),
-                nn.Conv2d(in_channels=1024, out_channels=1024,
+                nn.LeakyReLU(inplace=True),
+                nn.Conv2d(in_channels=512, out_channels=512,
                           kernel_size=3, stride=1, padding=1)
                                      )
 
+        elif model_arch == "vgg":
+            self.transform = transforms.Compose([
+                transforms.Resize((384, 384)),
+                transforms.Normalize(mean=0, std=1),
+                transforms.ToTensor(),
+            ])
+
+            vgg = torchvision.models.vgg11(pretrained=pretrained).features
+            for i, layer in enumerate(vgg.children()):
+                if isinstance(layer, nn.MaxPool2d):
+                    vgg[i] = nn.AvgPool2d(kernel_size=2, stride=2, padding=0,
+                                          ceil_mode=False)
+                elif isinstance(layer, nn.ReLU):
+                    vgg[i] = nn.LeakyReLU(inplace=True)
+
+            if pretrained:
+                for param in vgg.parameters():
+                    param.requires_grad = False
+
+            self.net = vgg
+
+        else:
+            raise ValueError(f"Unrecognized model architecture {model_arch}")
+
         self.softmax = nn.Softmax2d()
-            # self.layer_1 = nn.Sequential(
-            #     nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
-            #                          out_channels=96),
-            #     nn.MaxPool2d(kernel_size=2, stride=2)
-            #     )
-            # self.layer_1 = nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
-            #                          out_channels=96)
-            # self.layer_1_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
-            # self.layer_2 = nn.Sequential(
-            #     nn.Conv2d(in_channels=96, out_channels=256,
-            #                          kernel_size=5, stride=1),
-            #     nn.MaxPool2d(kernel_size=2, stride=2)
-            #     )
-            # self.layer_3 = nn.Conv2d(in_channels=256, out_channels=512,
-            #                          kernel_size=3, stride=1, padding=1)
-            # self.layer_4 = nn.Conv2d(in_channels=512, out_channels=1024,
-            #                          kernel_size=3, stride=1, padding=1)
-            # self.layer_5 = nn.Conv2d(in_channels=1024, out_channels=1024,
-            #                          kernel_size=3, stride=1, padding=1)
-            # self.layer_5_pooling = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # self-attention method proposed in self-attention gan Zhang et al.
-        self.frame_fx = nn.Conv2d(in_channels=1024, out_channels=1024,
+        self.frame_fx = nn.Conv2d(in_channels=512, out_channels=512,
                              kernel_size=1, stride=1)
-        self.frame_gx = nn.Conv2d(in_channels=1024, out_channels=1024,
+        self.frame_gx = nn.Conv2d(in_channels=512, out_channels=512,
                              kernel_size=1, stride=1)
-        self.frame_hx = nn.Conv2d(in_channels=1024, out_channels=1024,
+        self.frame_hx = nn.Conv2d(in_channels=512, out_channels=512,
                              kernel_size=1, stride=1)
-        self.frame_vx = nn.Conv2d(in_channels=1024, out_channels=1024,
+        self.frame_vx = nn.Conv2d(in_channels=512, out_channels=512,
                              kernel_size=1, stride=1)
 
     def forward(self, frame: torch.Tensor):
-        # forward pass through overfeat
+        # not to capture transformations in computation graph
+        frame.data = self.transform(frame.data)
+        # forward pass through feature_extractor
         frame = self.net(frame)
-        # frame = self.layer_1(frame)
-        # frame = self.layer_2(frame)
-        # frame = self.layer_3(frame)
-        # frame = self.layer_4(frame)
-        # frame = self.layer_5(frame)
         # self-attention gan
         frame_fx = self.frame_fx(frame)
         frame_gx = self.frame_gx(frame)
         frame_hx = self.frame_hx(frame)
         frame = self.softmax(frame_fx.transpose_(3, 2).matmul(frame_gx))
         frame = frame_hx.matmul(frame)
-        return self.frame_vx(frame).view(-1, 1024, 12 * 12)
+        return self.frame_vx(frame).view(-1, 512, 12 * 12)
 
 ##################################################################################
 #                               Fusion modules
@@ -185,7 +195,7 @@ class Fusion(nn.Module):
         args:
             real_past: a matrix containing unmodified past locations (num_agents, 7)
             pool: modified past locations (num_agents, 64)
-            context_feature: tensor of size=(1024, 144)
+            context_feature: tensor of size=(512, 144)
             i: desired agent number to forecast future, if -1, it will predict all the agents at the same time
         """
         batch = pool.size(1)

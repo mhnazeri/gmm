@@ -48,6 +48,7 @@ class Encoder_Decoder(nn.Module):
 
         if activation == "Sigmoid" \
                 or activation == "Tanh" \
+                or activation == "LeakyRelu" \
                 or activation == "Relu":
             pass
 

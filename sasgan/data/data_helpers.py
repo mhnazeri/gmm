@@ -108,12 +108,13 @@ def create_feature_matrix_for_viz(file):
 
 def save_train_samples(nuscenes_root, root_dir, save_dir):
     """save each train sample on hdd"""
-    transform = transforms.Compose([
-        transforms.Resize((231, 231)),
-        transforms.Grayscale(),
-        transforms.Normalize(mean=0, std=1)
-        transforms.ToTensor(),
-    ])
+    # moved to the models
+    # transform = transforms.Compose([
+    #     transforms.Resize((231, 231)),
+    #     transforms.Grayscale(),
+    #     transforms.Normalize(mean=0, std=1),
+    #     transforms.ToTensor(),
+    # ])
     json_files = os.path.join(root_dir, "exported_json_data")
     image_files = nuscenes_root
     files = os.listdir(json_files)
@@ -161,7 +162,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
                 # 4 frames in the past
                 past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
                 # each frame has an image
-                image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
+                image.append(Image.open(os.path.join(image_files, camera_address[stamp + j])))
 
             for j in range(4, 14):
                 # 10 frames in the future
@@ -171,16 +172,16 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
             image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
             # we only need 7 first features (translation, rotation) for relative history
             # a helper to slice out the 7 first features from each frame
-            # rel_past = torch.cat(past, 1)
-            # rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
-            rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
+            rel_past = torch.cat(past, 1)
+            rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
+            rel_past = [past_2 - past_1 for past_1, past_2 in zip(rel_past[:], rel_past[1:])]
 
             # if frame is at the beginning of a scene, add zero
             if stamp == 0:
-                rel_past.insert(0, torch.zeros_like(past[0]))
+                rel_past.insert(0, torch.zeros_like(past[0][:, :7]))
                 image.insert(0, torch.zeros_like(image[0]))
             else:
-                rel_past.insert(0, (past[0] - datums[-1]["past"][-1]))
+                rel_past.insert(0, (past[0] - datums[-1]["past"][-1][:, :7]))
                 image.insert(0, image[0] - datums[-1]["motion"][-1])
 
             data["past"] = torch.stack(past, dim=0)
