@@ -173,21 +173,24 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
             image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
             # we only need 7 first features (translation, rotation) for relative history
             # a helper to slice out the 7 first features from each frame
-            rel_past = torch.cat(past, 1)
-            rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
-            rel_past = [past_2 - past_1 for past_1, past_2 in zip(rel_past[:], rel_past[1:])]
+            # rel_past = torch.cat(past, 1)
+            # rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
+            rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
+            # copy velocity and size from real past to relative past tensor
+            rel_past = [rel_pt[8:] = pt[8:] for rel_pt, pt in zip(rel_past, past)]
 
             # if frame is at the beginning of a scene, add zero
             if stamp == 0:
-                rel_past.insert(0, torch.zeros_like(past[0][:, :7]))
+                rel_past.insert(0, torch.zeros_like(past[0]))
                 image.insert(0, torch.zeros_like(image[0]))
             else:
-                rel_past.insert(0, (past[0] - datums[-1]["past"][-1][:, :7]))
+                temp = past[0] - datums[-1]["past"][-1]
+                temp[8:] = past[0][8:]
+                rel_past.insert(0, temp)
                 image.insert(0, image[0] - datums[-1]["motion"][-1])
 
             data["past"] = torch.stack(past, dim=0)
             data["rel_past"] = torch.stack(rel_past, dim=0)
-
             data["motion"] = image
             data["future"] = torch.stack(future, dim=0)
 
@@ -233,7 +236,7 @@ def move_samples(source: str, dest: str, portion: float, seed: int = 42):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--nuscenes', dest='nuscenes', type=str, action='store_true', help='set nuscenes directory')
+    parser.add_argument('nuscenes', dest='nuscenes', type=str, action='store_true', help='set nuscenes directory')
     parser.add_argument('--source', dest='source', type=str, action='store_true', default="train_data", help='source directory')
     parser.add_argument('--dest', dest='dest', type=str, action='store_true', default="test_data", help='destination directory')
     parser.add_argument('--portion', dest='portion', type=float, action='store_true', default=0.15, help='what percentage of values should be used for testing')

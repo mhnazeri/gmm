@@ -249,27 +249,3 @@ if __name__ == "__main__":
         extract_scene_data_as_json(nusc, idx, "exported_json_data")
 
     print("Conversion is completed")
-
-    # sample = nusc.get("sample", "378a3a3e9af346308ab9dff8ced46d9c")
-    # sample_ann = nusc.get("sample_annotation", sample["anns"][0])
-    # # print(sample_ann)
-    # sample_data = nusc.get("sample", sample_ann["sample_token"])
-    # # print(sample_data)
-    # lidar = nusc.get("sample_data", sample_data["data"]["LIDAR_TOP"])
-    # # print(lidar)
-    # # print(nusc.get("ego_pose", lidar["ego_pose_token"]))
-
-    # print(nusc.get("calibrated_sensor", lidar["calibrated_sensor_token"]))
-    # print(nusc.get("calibrated_sensor", sample_data["calibrated_sensor_token"]))
-
-    # im = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402927612460.jpg"))
-    # im_2 = imageio.imread(os.path.join(root, "samples/CAM_FRONT/n015-2018-07-24-11-22-45+0800__CAM_FRONT__1532402928112460.jpg"))
-
-    # fig = plt.figure()
-    # a = fig.add_subplot(2, 1, 1)
-    # plt.imshow(im)
-    # # print("image 1: ", im.shape)
-    # # print("image 2: ", im_2.shape)
-    # a = fig.add_subplot(2, 1, 2)
-    # plt.imshow(im_2)
-    # plt.show()
