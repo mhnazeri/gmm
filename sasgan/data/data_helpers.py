@@ -1,6 +1,7 @@
 """General Helpers functions that can be used everywhere"""
 import os
 import argparse
+import random
 import numpy as np
 from PIL import Image
 import ujson as json
@@ -199,10 +200,45 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
             stamp += 1
 
 
+def move_samples(source: str, dest: str, portion: float, seed: int = 42):
+    """randomly selects portion of data and move them to test directory
+    args:
+        str source: source folder
+        str dest: destination folder to move selected samples
+        float portion: how much of the data you want as test
+        int seed: if you don't want reproducibility set seed to `None`
+    """
+    if seed:
+        random.seed(seed)
+
+    files = os.listdir(source)
+    total = len(files)
+    test_portion = int(total * portion)
+    selected_files = []
+    if not os.path.exists(dest):
+        os.mkdir(dest)
+
+    # selects samples randomly
+    for _ in range(test_portion):
+        file = random.choice(files)
+        selected_files.append(file)
+        # to prevent selecting the sample multiple times
+        del files[files.index(file)]
+
+    for file in selected_files:
+        os.rename(os.path.join(source, file), os.path.join(dest, file))
+
+    print(f"{test_portion} samples are selected as test samples")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--nuscenes', dest='nuscenes', action='store_true', help='set nuscenes directory')
+    parser.add_argument('--nuscenes', dest='nuscenes', type=str, action='store_true', help='set nuscenes directory')
+    parser.add_argument('--source', dest='source', type=str, action='store_true', default="train_data", help='source directory')
+    parser.add_argument('--dest', dest='dest', type=str, action='store_true', default="test_data", help='destination directory')
+    parser.add_argument('--portion', dest='portion', type=float, action='store_true', default=0.15, help='what percentage of values should be used for testing')
+    parser.add_argument('--seed', dest='seed', type=int, action='store_true', default=42, help='random seed')
     arguments = parser.parse_args()
-    nuscenes_root = arguments.nuscenes
-    save_train_samples(nuscenes_root, ".", "train_data")
-    print("Saving samples is comppleted!")
+    save_train_samples(arguments.nuscenes, ".", "train_data")
+    print("Saving samples is completed!")
+    move_samples(arguments.source, arguments.dest, arguments.portion, arguments.seed)

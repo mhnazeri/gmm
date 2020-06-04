@@ -51,6 +51,26 @@ def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None):
     return torch.sum(loss) / pred_pos.shape[1], loss
 
 
+def msd_error(pred_traj, pred_traj_gt, consider_ped=None):
+    """
+    :param pred_traj: Tensor of shape (seq_len, batch, 2). Predicted trajectory.
+    :param pred_traj_gt: Tensor of shape (seq_len, batch, 2). Ground truth
+    predictions.
+    :param consider_ped: Tensor of shape (batch)
+    :return tuple: the average loss over batch,
+             the loss tensor to be further used in qualitative results
+    """
+    seq_len, _, _ = pred_traj.size()
+    loss = (pred_traj_gt.permute(1, 0, 2) - pred_traj.permute(1, 0, 2)).pow(2)
+
+    if consider_ped is not None:
+        loss = loss.sum(dim=2).sum(dim=1) * consider_ped
+    else:
+        loss = loss.sum(dim=2).sum(dim=1)
+
+    return torch.sum(loss) / pred_traj.shape[1], loss
+
+
 def cae_loss(output_encoder, outputs, inputs, lamda=1e-4):
     """Contractive auto-encoder loss
     :param output_encoder: output of encoder module

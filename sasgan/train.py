@@ -73,6 +73,7 @@ def get_cae():
 
 def main():
     cae_encoder, cae_decoder = get_cae()
+    k_samples = int(TRAINING["k_samples"])
     logger.info("Preparing the dataloader for the main model...")
 
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
@@ -244,6 +245,12 @@ def main():
             fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
             ADE_loss = displacement_error(fake_traj, batch["future"])[0].item()
             FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1])[0].item()
+            msd = []
+            for _ in range(k_samples):
+                msd.append(msd_error(fake_traj, batch["future"])[0].item())
+                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+
+            min_msd = torch.min(msd)
 
             # Todo: show some qualitative results of the predictions to be shown in tensorboard
 
@@ -254,10 +261,12 @@ def main():
                 f"d_loss:{mean(d_losses):5.2f}\t"
                 f"g_loss:{mean(g_losses):5.2f}\t"
                 f"ADE_loss:{ADE_loss:8.2f}\t"
-                f"FDE_loss:{FDE_loss:8.2f}")
+                f"FDE_loss:{FDE_loss:8.2f}\t"
+                f"minMSD_loss:{min_msd:8.2f}")
 
         summary_writer_validation.add_scalar("ADE_loss", ADE_loss, epoch)
         summary_writer_validation.add_scalar("FDE_loss", FDE_loss, epoch)
+        summary_writer_validation.add_scalar("minMSD", min_msd, epoch)
 
         ##########################################################################################
         #                                   Saving the model
