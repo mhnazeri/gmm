@@ -109,13 +109,10 @@ def create_feature_matrix_for_viz(file):
 
 def save_train_samples(nuscenes_root, root_dir, save_dir):
     """save each train sample on hdd"""
-    # moved to the models
-    # transform = transforms.Compose([
-    #     transforms.Resize((231, 231)),
-    #     transforms.Grayscale(),
-    #     transforms.Normalize(mean=0, std=1),
-    #     transforms.ToTensor(),
-    # ])
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=0, std=1),
+    ])
     json_files = os.path.join(root_dir, "exported_json_data")
     image_files = nuscenes_root
     files = os.listdir(json_files)
@@ -163,7 +160,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
                 # 4 frames in the past
                 past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
                 # each frame has an image
-                image.append(Image.open(os.path.join(image_files, camera_address[stamp + j])))
+                image.append(transform(Image.open(os.path.join(image_files, camera_address[stamp + j]))))
 
             for j in range(4, 14):
                 # 10 frames in the future
@@ -177,7 +174,8 @@ def save_train_samples(nuscenes_root, root_dir, save_dir):
             # rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
             rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
             # copy velocity and size from real past to relative past tensor
-            rel_past = [rel_pt[8:] = pt[8:] for rel_pt, pt in zip(rel_past, past)]
+            for i in range(3):
+                rel_past[i][8:] = past[i + 1][8:]
 
             # if frame is at the beginning of a scene, add zero
             if stamp == 0:
@@ -236,11 +234,11 @@ def move_samples(source: str, dest: str, portion: float, seed: int = 42):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('nuscenes', dest='nuscenes', type=str, action='store_true', help='set nuscenes directory')
-    parser.add_argument('--source', dest='source', type=str, action='store_true', default="train_data", help='source directory')
-    parser.add_argument('--dest', dest='dest', type=str, action='store_true', default="test_data", help='destination directory')
-    parser.add_argument('--portion', dest='portion', type=float, action='store_true', default=0.15, help='what percentage of values should be used for testing')
-    parser.add_argument('--seed', dest='seed', type=int, action='store_true', default=42, help='random seed')
+    parser.add_argument('nuscenes', dest='nuscenes', type=str, help='set nuscenes directory')
+    parser.add_argument('--source', dest='source', type=str, default="train_data", help='source directory')
+    parser.add_argument('--dest', dest='dest', type=str, default="test_data", help='destination directory')
+    parser.add_argument('--portion', dest='portion', type=float, default=0.15, help='what percentage of values should be used for testing')
+    parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
     arguments = parser.parse_args()
     save_train_samples(arguments.nuscenes, ".", "train_data")
     print("Saving samples is completed!")

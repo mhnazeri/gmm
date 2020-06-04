@@ -84,9 +84,7 @@ class ContextualFeatures(nn.Module):
         if model_arch == "overfeat":
             self.transform = transforms.Compose([
                 transforms.Resize((231, 231)),
-                transforms.Grayscale(),
-                transforms.Normalize(mean=0, std=1),
-                transforms.ToTensor(),
+                transforms.Grayscale()
             ])
 
             self.net = nn.Sequential(
@@ -110,9 +108,7 @@ class ContextualFeatures(nn.Module):
 
         elif model_arch == "vgg":
             self.transform = transforms.Compose([
-                transforms.Resize((384, 384)),
-                transforms.Normalize(mean=0, std=1),
-                transforms.ToTensor(),
+                transforms.Resize((384, 384))
             ])
 
             vgg = torchvision.models.vgg11(pretrained=pretrained).features
