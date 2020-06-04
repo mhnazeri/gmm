@@ -31,7 +31,7 @@ def default_collate(batch):
 
 def init_weights(m):
     if m.__class__.__name__ == "Linear":
-        nn.init.kaiming_uniform_(m.weight)
+        nn.init.kaiming_normal_(m.weight)
 
 
 def get_device(logger, use_gpu=True):
