@@ -50,12 +50,22 @@ class CAEDataset(Dataset):
         files = os.listdir(json_files)
         files = [os.path.join(json_files, _path) for _path in files]
 
-        self.features = np.concatenate([create_feature_matrix(file) for file in files], axis=0).reshape((-1, 13))
-        self.features = self.features[np.where(self.features.sum(axis=1) != 0)]
-        # self.features = (self.features - self.features.mean()) / self.features.std()
+        self.features = []
+        for file in files:
+            l = create_feature_matrix(file)
+            # print(l[0, :13], l[0, 13:26])
+            # print(l[0, 26:39], l[0, 39:52])
+            # break
+            for i in range(38):
+                self.features.append(l[:, (i+1)*13:(i+2)*13] - l[:, (i)*13:(i+1)*13])
+                self.features[-1][:, 8:] = l[:, (i+1)*13+8:(i+2)*13]
 
-        num_features = list(range(self.features.shape[1]))
-        self.start_stop = list(zip(num_features[::13], num_features[13::13]))
+        self.features = torch.cat(self.features, dim=0)
+        self.features = self.features[torch.where(self.features.sum(axis=1) != 0)]
+        self.features = (self.features - self.features.mean()) / self.features.std()
+
+        # num_features = list(range(self.features.shape[1]))
+        # self.start_stop = list(zip(num_features[::13], num_features[13::13]))
 
     def __len__(self):
         return len(self.features)

@@ -22,7 +22,7 @@ from models import \
 ##########################################################################################
 #                          Getting the required configuration
 ##########################################################################################
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Getting the configuration for training
@@ -85,7 +85,7 @@ def main():
 
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
-        logger.info("Using the CAE enocder...")
+        logger.info("Using the CAE encoder...")
         embedder = cae_encoder
 
     logger.info("Constructing the GAN...")
@@ -93,6 +93,7 @@ def main():
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
+        de_embedder=cae_decoder,
         embedding_dim=int(CAE["embedding_dim"]),
         encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
         decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
@@ -174,14 +175,14 @@ def main():
         d_losses = []
         for batch in data_loader:
             d_steps_left = int(DISCRIMINATOR["steps"])
-            g_steps_left = int(GENERATOR["steps"])
 
             logger.debug(f"step {step} started!")
             # Transferring the input to the suitable device
             for key in batch.keys():
                 batch[key] = batch[key].to(device)
 
-                                                      
+            fake_labels = torch.ones(batch["past"].shape[1]).to(device) * random.uniform(0, 0.2)
+            true_labels = torch.ones(batch["past"].shape[1]).to(device) * random.uniform(0.7, 1.2)
             ###################################################################
             #                 training the discriminator                       
             ###################################################################
@@ -214,9 +215,8 @@ def main():
             logger.debug("Training the generator")
             g_optimizer.zero_grad()
 
-            # fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
             fake_prediction = d(fake_traj)
-                                                                                
+
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
             g_losses.append(g_loss.item())
@@ -246,7 +246,7 @@ def main():
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 msd.append(msd_error(fake_traj, batch["future"], output_size)[0].item())
 
-            min_msd = min(msd)
+            MSD_loss = min(msd)
 
             # Todo: show some qualitative results of the predictions to be shown in tensorboard
 

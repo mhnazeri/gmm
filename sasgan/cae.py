@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 sns.set(color_codes=True)
 
 class Encoder_Decoder(nn.Module):
@@ -162,6 +162,7 @@ def make_cae(
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
+            # print(samples[0])
             samples = samples.to(device)
             encoder.zero_grad()
             decoder.zero_grad()
@@ -241,7 +242,7 @@ if __name__ == "__main__":
                              drop_last=True)
 
     # Change this for experimenting other latent dims
-    latent_dim_list = [1, 2, 3, 4, 5, 6, 7, 8, 11, 16, 32, 64]
+    latent_dim_list = [1]
 
     for latent_dim in latent_dim_list:
         summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_" + str(latent_dim)))

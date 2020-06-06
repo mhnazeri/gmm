@@ -225,6 +225,7 @@ class Fusion(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  fusion_length,
+                 de_embedder=None,
                  output_size: int = 7,
                  hidden_dim: int = 64,
                  num_layers: int = 1,
@@ -244,12 +245,20 @@ class Decoder(nn.Module):
         self._output_size = output_size
 
         hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
-        self.hidden2pos = make_mlp(
-            layers=hidden2pos_structure,
-            activation=decoder_mlp_activation,
-            dropout=dropout,
-            batch_normalization=False
-        )
+
+        if de_embedder is None:
+            self.hidden2pos = make_mlp(
+                layers=hidden2pos_structure,
+                activation=decoder_mlp_activation,
+                dropout=dropout,
+                batch_normalization=False
+            )
+
+        else:
+            self.hidden2pos = nn.Sequential()
+            self.hidden2pos.add_module("map_input", nn.Linear(hidden_dim, de_embedder.mlp[0].in_features))
+            self.hidden2pos.add_module("cae_decoder", de_embedder)
+            self.hidden2pos.add_module("map_outout", nn.Linear(de_embedder.mlp[-3].out_features, output_size))
 
         self.decoder = nn.LSTM(fusion_length, hidden_dim,
                            num_layers, dropout=dropout)
@@ -275,13 +284,14 @@ class Decoder(nn.Module):
 # ________________________________________________________________________________
 class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
-    def __init__(self, embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
+    def __init__(self, embedder, de_embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
                  fusion_hidden_dim, fused_vector_length: int = 272):
 
         super(GenerationUnit, self).__init__()
 
         self.decoder = Decoder(
+            de_embedder=de_embedder,
             fusion_length=fused_vector_length,
             output_size=output_size,
             hidden_dim=decoder_h_dim,
@@ -345,6 +355,7 @@ class TrajectoryGenerator(nn.Module):
     """The GenerationUnit will be used to forecast for sequence_length"""
     def __init__(self,
                  embedder=None,
+                 de_embedder=None,
                  embedding_dim: int = 7,
                  encoder_h_dim: int = 64,
                  decoder_h_dim: int = 64,
@@ -365,6 +376,7 @@ class TrajectoryGenerator(nn.Module):
 
         self.gu = GenerationUnit(
             embedder=embedder,
+            de_embedder=de_embedder,
             embedding_dim=embedding_dim,
             encoder_h_dim=encoder_h_dim,
             decoder_h_dim=decoder_h_dim,
@@ -414,7 +426,7 @@ class TrajectoryGenerator(nn.Module):
             final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
             gu_input_rel = final_prediction_rel[-obs_length:]
 
-        return final_prediction[-self._seq_len:]
+        return final_prediction
 
 ##################################################################################
 #                               GAN Discriminator
