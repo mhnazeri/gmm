@@ -227,7 +227,7 @@ def main():
             g_loss.backward()
             g_losses.append(g_loss.item())
 
-            ummary_writer_generator.add_scalar("GAN_loss", g_loss, step)
+            summary_writer_generator.add_scalar("GAN_loss", g_loss, step)
 
             g_optimizer.step()
 

@@ -268,6 +268,7 @@ if __name__ == "__main__":
                  dropout=float(CAE["dropout"]),
                  bn=bool(CAE["batch_normalization"]),
                  input_size=int(TRAINING["input_size"]),
+                 input_size=int(CAE["output_size"]),
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),
