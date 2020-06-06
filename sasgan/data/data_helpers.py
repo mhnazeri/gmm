@@ -133,7 +133,6 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
     images = []
     lidar = []
     features = []
-    datums = []
     # read the list 13 element at a time
     num_features = [x for x in range(521) if x % 13 == 0]
     start_stop = list(zip(num_features[:], num_features[1:]))
@@ -191,17 +190,20 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
                 rel_past.insert(0, torch.zeros_like(past[0]))
                 image.insert(0, torch.zeros_like(image[0]))
             else:
-                temp = past[0] - datums[-1]["past"][-1]
+                temp = past[0] - datum["past"]
                 temp[8:] = past[0][8:]
                 rel_past.insert(0, temp)
-                image.insert(0, image[0] - datums[-1]["motion"][-1])
+                image.insert(0, image[0] - datum["motion"])
 
+            # hold the info of the last frame of previos sample
+            datum = {}
+            datum["past"] = past[-1]
+            datum["motion"] = image[-1]
             data["past"] = torch.stack(past, dim=0)
             data["rel_past"] = torch.stack(rel_past, dim=0)
             data["motion"] = image
             data["future"] = torch.stack(future, dim=0)
 
-            datums.append(data)
             # save data on hard
             torch.save(data, os.path.join(save_dir, f"{index}.pt"))
             print(f"sample {index} has been saved")
