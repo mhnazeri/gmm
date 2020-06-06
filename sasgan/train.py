@@ -5,11 +5,12 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import numpy as np
 import logging
+import random
 import os
 
 # Custom defined packages
 from data.loader import *
-from losses import bce_loss, displacement_error, final_displacement_error
+from losses import bce_loss, displacement_error, final_displacement_error, msd_error, gan_d_loss, gan_g_loss
 from utils import *
 from torch.utils.data import DataLoader, TensorDataset
 from cae import make_cae
@@ -17,7 +18,6 @@ from numpy import inf, mean
 from models import \
     TrajectoryGenerator, \
     TrajectoryDiscriminator
-
 
 ##########################################################################################
 #                          Getting the required configuration
@@ -73,7 +73,6 @@ def get_cae():
 
 def main():
     cae_encoder, cae_decoder = get_cae()
-    k_samples = int(TRAINING["k_samples"])
     logger.info("Preparing the dataloader for the main model...")
 
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
@@ -98,6 +97,7 @@ def main():
         decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
         seq_length=int(GENERATOR["seq_length"]),
         input_size=int(TRAINING["input_size"]),
+        output_size=int(GENERATOR["output_size"]),
         decoder_mlp_structure=convert_str_to_list(GENERATOR["decoder_h2p_structure"]),
         decoder_mlp_activation=str(GENERATOR["decoder_h2p_activation"]),
         dropout=float(GENERATOR["dropout"]),
@@ -120,7 +120,6 @@ def main():
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
         dropout=float(DISCRIMINATOR["dropout"])
         )
-
     logger.debug("Here is the discriminator...")
     logger.debug(d)
 
@@ -176,12 +175,7 @@ def main():
             d_steps_left = int(DISCRIMINATOR["steps"])
             g_steps_left = int(GENERATOR["steps"])
 
-            batch_size = batch["past"].shape[1]
-            true_labels = torch.ones(batch_size, 1).to(device)
-            fake_labels = torch.zeros(batch_size, 1).to(device)
-
             logger.debug(f"step {step} started!")
-
             # Transferring the input to the suitable device
             for key in batch.keys():
                 batch[key] = batch[key].to(device)
@@ -198,7 +192,7 @@ def main():
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 fake_prediction = d(fake_traj)
 
-                g_loss = bce_loss(fake_prediction, true_labels)
+                g_loss = gan_g_loss(fake_prediction)
                 g_losses.append(g_loss.item())
 
                 summary_writer_generator.add_scalar("GAN_loss", g_loss, step)
@@ -214,14 +208,10 @@ def main():
                 ###################################################################
                 logger.debug("Training the discriminator")
 
-                real_predictions = d(batch["rel_past"])
-                real_loss = bce_loss(real_predictions, true_labels)
-
+                real_predictions = d(batch["past"])
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 fake_prediction = d(fake_traj)
-                fake_loss = bce_loss(fake_prediction, fake_labels)
-
-                d_loss = fake_loss + real_loss
+                d_loss = gan_d_loss(real_predictions, fake_prediction)
                 d_losses.append(d_loss.item())
 
                 summary_writer_discriminator.add_scalar("GAN_loss", d_loss, step)
@@ -243,30 +233,32 @@ def main():
             d.eval()
 
             fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-            ADE_loss = displacement_error(fake_traj, batch["future"])[0].item()
-            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1])[0].item()
-            msd = []
-            for _ in range(k_samples):
-                msd.append(msd_error(fake_traj, batch["future"])[0].item())
-                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+            output_size = int(GENERATOR["output_size"])
+            ADE_loss = displacement_error(fake_traj, batch["future"], output_size)[0].item()
+            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1], output_size)[0].item()
 
-            min_msd = torch.min(msd)
+            msd = []
+            for _ in range(int(TRAINING["k_samples"])):
+                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+                msd.append(msd_error(fake_traj, batch["future"], output_size)[0].item())
+
+            MSD_loss = min(msd)
 
             # Todo: show some qualitative results of the predictions to be shown in tensorboard
 
         if int(TRAINING["epochs"]) > 0:
             epochs = int(TRAINING["epochs"])
             logger.info(
-                f"TRAINING[{(epoch + 1):4}/{(start_epoch + epochs):4}]\t"
-                f"d_loss:{mean(d_losses):5.2f}\t"
-                f"g_loss:{mean(g_losses):5.2f}\t"
-                f"ADE_loss:{ADE_loss:8.2f}\t"
-                f"FDE_loss:{FDE_loss:8.2f}\t"
-                f"minMSD_loss:{min_msd:8.2f}")
+                f"TRAINING[{(epoch + 1):4}/{(start_epoch + epochs):4}]      "
+                f"d_loss:{mean(d_losses):5.2f}      "
+                f"g_loss:{mean(g_losses):5.2f}      "
+                f"ADE_loss:{ADE_loss:8.2f}      "
+                f"FDE_loss:{FDE_loss:8.2f}      "
+                f"MSD_loss:{MSD_loss:8.2f}      ")
 
         summary_writer_validation.add_scalar("ADE_loss", ADE_loss, epoch)
         summary_writer_validation.add_scalar("FDE_loss", FDE_loss, epoch)
-        summary_writer_validation.add_scalar("minMSD", min_msd, epoch)
+        summary_writer_validation.add_scalar("MSD_loss", MSD_loss, epoch)
 
         ##########################################################################################
         #                                   Saving the model

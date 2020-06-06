@@ -52,7 +52,7 @@ class CAEDataset(Dataset):
 
         self.features = np.concatenate([create_feature_matrix(file) for file in files], axis=0).reshape((-1, 13))
         self.features = self.features[np.where(self.features.sum(axis=1) != 0)]
-        self.features = (self.features - self.features.mean()) / self.features.std()
+        # self.features = (self.features - self.features.mean()) / self.features.std()
 
         num_features = list(range(self.features.shape[1]))
         self.start_stop = list(zip(num_features[::13], num_features[13::13]))

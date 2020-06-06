@@ -170,7 +170,7 @@ def make_cae(
 
             outputs = decoder(outputs_encoder)
 
-            loss = cae_loss(outputs_encoder, outputs, samples)
+            loss = cae_loss(outputs_encoder, outputs, samples, device)
             losses.append(loss.item())
 
             optimizer.zero_grad()
