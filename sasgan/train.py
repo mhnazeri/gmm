@@ -9,7 +9,7 @@ import os
 
 # Custom defined packages
 from data.loader import *
-from losses import bce_loss, displacement_error, final_displacement_error
+from losses import bce_loss, displacement_error, final_displacement_error, msd_error
 from utils import *
 from torch.utils.data import DataLoader, TensorDataset
 from cae import make_cae
@@ -60,7 +60,8 @@ def get_cae():
                                         decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
                                         dropout=float(CAE["dropout"]),
                                         bn=bool(CAE["batch_normalization"]),
-                                        input_size=int(TRAINING["input_size"]),
+                                        input_size=int(CAE["input_size"]),
+                                        output_size=int(CAE["output_size"]),
                                         latent_dim=int(CAE["embedding_dim"]),
                                         iterations=int(CAE["epochs"]),
                                         activation=str(CAE["activation"]),
@@ -186,50 +187,49 @@ def main():
             for key in batch.keys():
                 batch[key] = batch[key].to(device)
 
-            g.zero_grad()
-            d.zero_grad()
-
-            while g_steps_left > 0:
-                ###################################################################
-                #                 training the generator
-                ###################################################################
-                logger.debug("Training the generator")
-
-                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                fake_prediction = d(fake_traj)
-
-                g_loss = bce_loss(fake_prediction, true_labels)
-                g_losses.append(g_loss.item())
-
-                summary_writer_generator.add_scalar("GAN_loss", g_loss, step)
-
-                g_optimizer.zero_grad()
-                g_loss.backward()
-                g_optimizer.step()
-                g_steps_left -= 1
-
+                                                      
+            ###################################################################
+            #                 training the discriminator                       
+            ###################################################################
             while d_steps_left > 0:
-                ###################################################################
-                #                 training the discriminator
-                ###################################################################
-                logger.debug("Training the discriminator")
+                # d.zero_grad()                                                    
+                logger.debug("Training the discriminator")                         
+                d_optimizer.zero_grad()
 
-                real_predictions = d(batch["rel_past"])
+                real_predictions = d(batch["past"])
                 real_loss = bce_loss(real_predictions, true_labels)
-
+                real_loss.backward()
+                                                                                    
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                fake_prediction = d(fake_traj)
+                fake_prediction = d(fake_traj.detach())
                 fake_loss = bce_loss(fake_prediction, fake_labels)
+                fake_loss.backward()
 
                 d_loss = fake_loss + real_loss
                 d_losses.append(d_loss.item())
 
                 summary_writer_discriminator.add_scalar("GAN_loss", d_loss, step)
 
-                d_optimizer.zero_grad()
-                d_loss.backward()
-                d_optimizer.step()
-                d_steps_left -= 1
+                d_optimizer.step()                                                 
+                d_steps_left -= 1                                              
+
+            ###################################################################
+            #                 training the generator                           
+            ###################################################################
+            # g.zero_grad()
+            logger.debug("Training the generator")
+            g_optimizer.zero_grad()
+
+            # fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
+            fake_prediction = d(fake_traj)
+                                                                                
+            g_loss = bce_loss(fake_prediction, true_labels)
+            g_loss.backward()
+            g_losses.append(g_loss.item())
+
+            ummary_writer_generator.add_scalar("GAN_loss", g_loss, step)
+
+            g_optimizer.step()
 
             logger.debug(f"step {step} finished!")
             step += 1
@@ -250,7 +250,7 @@ def main():
                 msd.append(msd_error(fake_traj, batch["future"])[0].item())
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
 
-            min_msd = torch.min(msd)
+            min_msd = min(msd)
 
             # Todo: show some qualitative results of the predictions to be shown in tensorboard
 

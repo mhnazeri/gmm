@@ -28,6 +28,7 @@ class Encoder_Decoder(nn.Module):
     def __init__(self,
                  Encoder :bool = True,
                  input_size: int = 13,
+                 output_size: int = 7,
                  structure: list = [128],
                  latent_dimension: int = 7,
                  dropout: float = 0.0,
@@ -36,6 +37,7 @@ class Encoder_Decoder(nn.Module):
 
         super(Encoder_Decoder, self).__init__()
         self.n_inputs = input_size
+        self.n_outputs = output_size
         self.n_latent = latent_dimension
 
         if Encoder:
@@ -44,7 +46,7 @@ class Encoder_Decoder(nn.Module):
 
         else:
             structure.insert(0, latent_dimension)
-            structure.append(input_size)
+            structure.append(output_size)
 
         if activation == "Sigmoid" \
                 or activation == "Tanh" \
@@ -75,6 +77,7 @@ def make_cae(
         dropout: float = 0.0,
         bn: bool = False,
         input_size: int = 13,
+        output_size: int = 7,
         latent_dim: int = 16,
         iterations: int = 500,
         activation: str = "Relu",
@@ -104,6 +107,7 @@ def make_cae(
 
     decoder = Encoder_Decoder(Encoder=False,
                               input_size=input_size,
+                              output_size=output_size,
                               structure=decoder_structure,
                               latent_dimension=latent_dim,
                               dropout=dropout,
@@ -162,7 +166,6 @@ def make_cae(
             encoder.zero_grad()
             decoder.zero_grad()
 
-            # What are these for Mohammad??
             samples.requires_grad = True
             samples.retain_grad()
 
@@ -170,7 +173,7 @@ def make_cae(
 
             outputs = decoder(outputs_encoder)
 
-            loss = cae_loss(outputs_encoder, outputs, samples)
+            loss = cae_loss(outputs_encoder, outputs, samples[:, :7])
             losses.append(loss.item())
 
             optimizer.zero_grad()
