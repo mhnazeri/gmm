@@ -36,9 +36,9 @@ class Encoder_Decoder(nn.Module):
                  activation="Sigmoid"):
 
         super(Encoder_Decoder, self).__init__()
-        self.n_inputs = input_size
-        self.n_outputs = output_size
-        self.n_latent = latent_dimension
+        # self.n_inputs = input_size
+        # self.n_outputs = output_size
+        # self.n_latent = latent_dimension
 
         if Encoder:
             structure.insert(0, input_size)
@@ -55,7 +55,7 @@ class Encoder_Decoder(nn.Module):
             pass
 
         else:
-            raise "{} function is not supported".format(self.activation)
+            raise "{} function is not supported".format(activation)
 
         self.mlp = make_mlp(
             layers=structure,
@@ -166,14 +166,14 @@ def make_cae(
             encoder.zero_grad()
             decoder.zero_grad()
 
-            samples.requires_grad = True
+            samples.requires_grad_(True)
             samples.retain_grad()
 
             outputs_encoder = encoder(samples)
 
             outputs = decoder(outputs_encoder)
 
-            loss = cae_loss(outputs_encoder, outputs, samples[:, :7])
+            loss = cae_loss(outputs_encoder, outputs, samples)
             losses.append(loss.item())
 
             optimizer.zero_grad()
@@ -220,24 +220,12 @@ def make_cae(
                 logger.info(f"Saving the model(intervals)...")
                 save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
-    """
-    Freeze the parameters on encoder and decoder
-    > Note for mohammad, this does not freeze the waits necessarily, to do so you have to set requires_grad to false
-    Check this plz: https://medium.com/jun-devpblog/pytorch-6-model-train-vs-model-eval-no-grad-hyperparameter-tuning-3812c216a3bd
-    But later, when training the Whole module we should add the parameters with requires_grad to True to exclude the 
-        parameters related to these submodeules (encoder and decoder)
-    Check this plz: https://discuss.pytorch.org/t/correct-way-to-freeze-layers/26714
-    """
-    # encoder.eval()
-    # decoder.eval()
-
     encoder.requires_grad_(False)
     decoder.requires_grad_(False)
 
     return encoder, decoder
 
 if __name__ == "__main__":
-
     # This section is for experimenting about the best latent dimension
     DIRECTORIES = config("Directories")
     CAE = config("CAE")
@@ -253,10 +241,10 @@ if __name__ == "__main__":
                              drop_last=True)
 
     # Change this for experimenting other latent dims
-    latent_dim_list = [8, 11, 16, 32, 64]
+    latent_dim_list = [1, 2, 3, 4, 5, 6, 7, 8, 11, 16, 32, 64]
 
     for latent_dim in latent_dim_list:
-        summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_test" + str(latent_dim)))
+        summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_" + str(latent_dim)))
         temp = os.path.join(DIRECTORIES["save_model"], "cae_test")
         save_dir = os.path.join(temp, str(latent_dim))
 
@@ -268,7 +256,7 @@ if __name__ == "__main__":
                  dropout=float(CAE["dropout"]),
                  bn=bool(CAE["batch_normalization"]),
                  input_size=int(TRAINING["input_size"]),
-                 input_size=int(CAE["output_size"]),
+                 output_size=int(CAE["output_size"]),
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),

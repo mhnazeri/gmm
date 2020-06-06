@@ -228,7 +228,7 @@ class Decoder(nn.Module):
                  output_size: int = 7,
                  hidden_dim: int = 64,
                  num_layers: int = 1,
-                 dropout:float = 0.0,
+                 dropout: float = 0.0,
                  decoder_mlp_structure: list = [128],
                  decoder_mlp_activation: str = "Relu"
                  ):
