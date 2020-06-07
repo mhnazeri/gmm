@@ -142,8 +142,8 @@ def main():
     d.type(tensor_type)
 
     # defining the loss and optimizers for generator and discriminator
-    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]))
-    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]))
+    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
+    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
 
     # Loading the checkpoint if existing
     save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")

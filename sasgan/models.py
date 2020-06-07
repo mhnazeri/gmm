@@ -426,7 +426,7 @@ class TrajectoryGenerator(nn.Module):
             final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
             gu_input_rel = final_prediction_rel[-obs_length:]
 
-        return final_prediction
+        return final_prediction[:, -self._seq_len]
 
 ##################################################################################
 #                               GAN Discriminator
