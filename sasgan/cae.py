@@ -190,7 +190,6 @@ def make_cae(
                 print("samples", samples)
                 break
 
-        print(mean(losses))
         summary_writer.add_scalar("cae_loss", mean(losses), epoch)
         logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
 
