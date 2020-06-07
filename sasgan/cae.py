@@ -96,7 +96,7 @@ def make_cae(
     :return: The trained encoder and decoder model with frozen weights
     """
 
-    """create the whole cae"""
+    # create the whole cae
     encoder = Encoder_Decoder(Encoder=True,
                               input_size=input_size,
                               structure=encoder_structure,
@@ -162,7 +162,6 @@ def make_cae(
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
-            # print(samples[0])
             samples = samples.to(device)
             encoder.zero_grad()
             decoder.zero_grad()
@@ -191,6 +190,7 @@ def make_cae(
                 print("samples", samples)
                 break
 
+        print(mean(losses))
         summary_writer.add_scalar("cae_loss", mean(losses), epoch)
         logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
 
@@ -243,7 +243,7 @@ if __name__ == "__main__":
                              drop_last=True)
 
     # Change this for experimenting other latent dims
-    latent_dim_list = [1]
+    latent_dim_list = [1, 2, 3, 4, 5, 6, 7, 8, 16, 32, 64]
 
     for latent_dim in latent_dim_list:
         summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_" + str(latent_dim)))
