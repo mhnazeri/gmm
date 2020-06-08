@@ -182,7 +182,7 @@ def make_cae(
 
             step += 1
 
-            summary_writer.add_scalar("cae_loss", loss, step)
+
 
             if torch.isnan(loss):
                 print("outputs_encoder", outputs_encoder)
@@ -190,6 +190,7 @@ def make_cae(
                 print("samples", samples)
                 break
 
+        summary_writer.add_scalar("cae_loss", mean(losses), epoch)
         logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
 
         """
