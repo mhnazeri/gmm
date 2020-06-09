@@ -22,7 +22,7 @@ from models import \
 ##########################################################################################
 #                          Getting the required configuration
 ##########################################################################################
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Getting the configuration for training

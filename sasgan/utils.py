@@ -140,15 +140,13 @@ def make_mlp(layers: list,
     """
     Makes a mlp with the specified inputs
     :param layers: a list containing the dimensions of the linear layers
-    :param activation: "Relu" or "LeakyRelu"
+    :param activation: "Relu", "LeakyRelu", "Sigmoid" or "Tanh"
     :param dropout: a float between 0.0 and 1.0
     :return: the nn.module object constructed with nn.Sequential
     """
     nn_layers = []
     for dim_in, dim_out in zip(layers[:-1], layers[1:]):
         nn_layers.append(nn.Linear(dim_in, dim_out))
-        if batch_normalization :
-            nn_layers.append(nn.BatchNorm1d(dim_out))
         if activation == "Relu":
             nn_layers.append(nn.ReLU())
         elif activation == "LeakyRelu":
@@ -157,6 +155,8 @@ def make_mlp(layers: list,
             nn_layers.append(nn.Sigmoid())
         elif activation == "Tanh":
             nn_layers.append(nn.Tanh())
+        if batch_normalization :
+            nn_layers.append(nn.BatchNorm1d(dim_out))
         if dropout > 0:
             nn_layers.append(nn.Dropout(p=dropout))
 

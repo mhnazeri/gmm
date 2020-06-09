@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 sns.set(color_codes=True)
 
 class Encoder_Decoder(nn.Module):
@@ -114,6 +114,15 @@ def make_cae(
                               activation=activation,
                               batch_normalization=bn)
 
+    # Get the suitable device to run the model on
+    device = get_device(logger)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+
+    tensor_type = get_tensor_type()
+    encoder.type(tensor_type).train()
+    decoder.type(tensor_type).train()
+
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
@@ -147,15 +156,6 @@ def make_cae(
         logger.debug("Done")
         encoder.apply(init_weights)
         decoder.apply(init_weights)
-
-    # Get the suitable device to run the model on
-    device = get_device(logger)
-    encoder = encoder.to(device)
-    decoder = decoder.to(device)
-
-    tensor_type = get_tensor_type()
-    encoder.type(tensor_type).train()
-    decoder.type(tensor_type).train()
 
     for epoch in range(start_epoch, start_epoch + iterations):
         logger.debug("Training the CAE")
