@@ -351,6 +351,8 @@ class GenerationUnit(nn.Module):
         return decoder_output[0], decoder_output[1]
 
 
+
+
 class TrajectoryGenerator(nn.Module):
     """The GenerationUnit will be used to forecast for sequence_length"""
     def __init__(self,

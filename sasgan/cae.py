@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 sns.set(color_codes=True)
 
 class Encoder_Decoder(nn.Module):

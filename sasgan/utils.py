@@ -147,7 +147,7 @@ def make_mlp(layers: list,
     nn_layers = []
     for dim_in, dim_out in zip(layers[:-1], layers[1:]):
         nn_layers.append(nn.Linear(dim_in, dim_out))
-        if batch_normalization :
+        if batch_normalization and dim_out != layers[-1]:
             nn_layers.append(nn.BatchNorm1d(dim_out))
         if activation == "Relu":
             nn_layers.append(nn.ReLU())
