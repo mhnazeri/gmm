@@ -107,7 +107,8 @@ def create_feature_matrix_for_viz(file):
     return datum, calibrated_features
 
 
-def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
+def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
+                       save_dir: str, arch: str="overfeat"):
     """save each train sample on hdd"""
     if arch == "overfeat":
         transform = transforms.Compose([
@@ -123,7 +124,7 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
             transforms.Normalize(mean=0, std=1),
         ])
 
-    json_files = os.path.join(root_dir, "exported_json_data")
+    json_files = os.path.join(root_dir, source)
     files = os.listdir(json_files)
     files = [os.path.join(json_files, _path) for _path in files]
     # check if save_dir exists, otherwise create one
@@ -212,46 +213,47 @@ def save_train_samples(nuscenes_root, root_dir, save_dir, arch="overfeat"):
             stamp += 1
 
 
-def move_samples(source: str, dest: str, portion: float, seed: int = 42):
-    """randomly selects portion of data and move them to test directory
-    args:
-        str source: source folder
-        str dest: destination folder to move selected samples
-        float portion: how much of the data you want as test
-        int seed: if you don't want reproducibility set seed to `None`
-    """
-    if seed:
-        random.seed(seed)
+# def move_samples(source: str, dest: str, portion: float, seed: int = 42):
+#     """randomly selects portion of data and move them to test directory
+#     args:
+#         str source: source folder
+#         str dest: destination folder to move selected samples
+#         float portion: how much of the data you want as test
+#         int seed: if you don't want reproducibility set seed to `None`
+#     """
+#     if seed:
+#         random.seed(seed)
 
-    files = os.listdir(source)
-    total = len(files)
-    test_portion = int(total * portion)
-    selected_files = []
-    if not os.path.exists(dest):
-        os.mkdir(dest)
+#     files = os.listdir(source)
+#     total = len(files)
+#     test_portion = int(total * portion)
+#     selected_files = []
+#     if not os.path.exists(dest):
+#         os.mkdir(dest)
 
-    # selects samples randomly
-    for _ in range(test_portion):
-        file = random.choice(files)
-        selected_files.append(file)
-        # to prevent selecting the sample multiple times
-        del files[files.index(file)]
+#     # selects samples randomly
+#     for _ in range(test_portion):
+#         file = random.choice(files)
+#         selected_files.append(file)
+#         # to prevent selecting the sample multiple times
+#         del files[files.index(file)]
 
-    for file in selected_files:
-        os.rename(os.path.join(source, file), os.path.join(dest, file))
+#     for file in selected_files:
+#         os.rename(os.path.join(source, file), os.path.join(dest, file))
 
-    print(f"{test_portion} samples are selected as test samples")
+#     print(f"{test_portion} samples are selected as test samples")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('nuscenes', type=str, help='set nuscenes directory')
-    parser.add_argument('--source', dest='source', type=str, default="train_data", help='source directory')
-    parser.add_argument('--dest', dest='dest', type=str, default="test_data", help='destination directory')
-    parser.add_argument('--portion', dest='portion', type=float, default=0.1, help='what percentage of values should be used for testing')
-    parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
+    parser.add_argument('--source', dest='source', type=str, default="meta_data", help='source directory')
+    parser.add_argument('--save_dir', dest='save_dir', type=str, default="train_data", help='save directory')
+    # parser.add_argument('--dest', dest='dest', type=str, default="test_data", help='destination directory')
+    # parser.add_argument('--portion', dest='portion', type=float, default=0.1, help='what percentage of values should be used for testing')
+    # parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
     parser.add_argument('--arch', dest='arch', type=str, default="overfeat", help='feature extractor model architecture')
     args = parser.parse_args()
-    save_train_samples(args.nuscenes, ".", args.source, args.arch)
+    save_train_samples(args.nuscenes, ".", args.source, args.save_dir, args.arch)
     print("Saving samples is completed!")
-    move_samples(args.source, args.dest, args.portion, args.seed)
+    # move_samples(args.source, args.dest, args.portion, args.seed)

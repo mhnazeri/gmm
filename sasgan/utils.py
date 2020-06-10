@@ -140,7 +140,7 @@ def make_mlp(layers: list,
     """
     Makes a mlp with the specified inputs
     :param layers: a list containing the dimensions of the linear layers
-    :param activation: "Relu" or "LeakyRelu"
+    :param activation: "Relu", "LeakyRelu", "Sigmoid" or "Tanh"
     :param dropout: a float between 0.0 and 1.0
     :return: the nn.module object constructed with nn.Sequential
     """

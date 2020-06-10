@@ -46,7 +46,7 @@ class CAEDataset(Dataset):
     def __init__(self, root_dir: str):
         # self.scene_frames = create_feature_matrix(os.path.join(root_dir,json_file))
         self.root_dir = root_dir
-        json_files = os.path.join(root_dir, "exported_json_data")
+        json_files = os.path.join(root_dir, "meta_data")
         files = os.listdir(json_files)
         files = [os.path.join(json_files, _path) for _path in files]
 
