@@ -157,6 +157,8 @@ def make_mlp(layers: list,
             nn_layers.append(nn.Sigmoid())
         elif activation == "Tanh":
             nn_layers.append(nn.Tanh())
+        elif activation == "ELU":
+            nn_layers.append(nn.ELU())
         if dropout > 0:
             nn_layers.append(nn.Dropout(p=dropout))
 
