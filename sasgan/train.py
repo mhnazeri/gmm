@@ -93,7 +93,7 @@ def main():
     # Construct the models
     g = TrajectoryGenerator(
         embedder=embedder,
-        de_embedder=cae_decoder,
+        de_embedder=None,
         embedding_dim=int(CAE["embedding_dim"]),
         encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
         decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
@@ -131,6 +131,9 @@ def main():
 
     # Get the device type
     device = get_device(logger)
+
+    clipping_threshold_d = int(TRAINING["gradient_clipping_d"])
+    clipping_threshold_g = int(TRAINING["gradient_clipping_g"])
 
     # Transfer the models to gpu
     g.to(device)
@@ -193,17 +196,21 @@ def main():
 
                 real_predictions = d(batch["past"])
                 real_loss = bce_loss(real_predictions, true_labels)
-                real_loss.backward()
+                # real_loss.backward()
                                                                                     
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
                 fake_prediction = d(fake_traj.detach())
                 fake_loss = bce_loss(fake_prediction, fake_labels)
-                fake_loss.backward()
+                # fake_loss.backward()
 
                 d_loss = fake_loss + real_loss
+                d_loss.backward()
                 d_losses.append(d_loss.item())
 
                 summary_writer_discriminator.add_scalar("GAN_loss", d_loss, step)
+                if clipping_threshold_d > 0:
+                    nn.utils.clip_grad_norm_(d.parameters(),
+                                     clipping_threshold_d)
 
                 d_optimizer.step()                                                 
                 d_steps_left -= 1                                              
@@ -222,6 +229,9 @@ def main():
             g_losses.append(g_loss.item())
 
             summary_writer_generator.add_scalar("GAN_loss", g_loss, step)
+
+            if clipping_threshold_g > 0:
+                nn.utils.clip_grad_norm_(g.parameters(), clipping_threshold_g)
 
             g_optimizer.step()
 

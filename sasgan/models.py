@@ -162,7 +162,7 @@ class Fusion(nn.Module):
         # Todo: fix the dimension as input
         self.fuse = nn.Sequential(nn.Linear(hidden_size * 2, 256),
                                     # nn.MaxPool1d(kernel_size=2, stride=2),
-                                    nn.ReLU())
+                                    nn.Tanh())
 
     def initiate_hidden(self, batch):
         return (
@@ -251,12 +251,22 @@ class Decoder(nn.Module):
         hidden2pos_structure = [hidden_dim] + decoder_mlp_structure + [output_size]
 
         if de_embedder is None:
-            self.hidden2pos = make_mlp(
-                layers=hidden2pos_structure,
-                activation=decoder_mlp_activation,
-                dropout=dropout,
-                batch_normalization=False
-            )
+            self.hidden2pos = []
+            # make_mlp(
+            #     layers=hidden2pos_structure,
+            #     activation=decoder_mlp_activation,
+            #     dropout=dropout,
+            #     batch_normalization=False
+            # )
+            # nn_layers = []
+            self.hidden2pos.append(nn.Linear(hidden_dim, 128))
+            self.hidden2pos.append(nn.BatchNorm1d(dim_out))
+            self.hidden2pos.append(nn.Tanh())
+            self.hidden2pos.append(nn.Linear(128, 128))
+            self.hidden2pos.append(nn.BatchNorm1d(dim_out))
+            self.hidden2pos.append(nn.Tanh())
+            self.hidden2pos.append(nn.Linear(128, output_size))
+            self.hidden2pos = nn.Sequential(*self.hidden2pos)
 
         else:
             self.hidden2pos = nn.Sequential()
@@ -320,7 +330,7 @@ class GenerationUnit(nn.Module):
         encoder_decoder_mlp_structure = [encoder_h_dim, decoder_h_dim]
         self.encoder_decoder_h = make_mlp(
             layers=encoder_decoder_mlp_structure,
-            activation="Relu",
+            activation="Tanh",
             batch_normalization=True,
         )
 
@@ -347,9 +357,11 @@ class GenerationUnit(nn.Module):
                                      states[0],
                                      context_features)
 
-        decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
-        decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
-        decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim).to(device)
+        # decoder_h = self.encoder_decoder_h(states[0].view(-1, self._encoder_h_dim))
+        # decoder_h = decoder_h.view(self._num_layers,  batch_size, self._decoder_h_dim)
+        decoder_h = states[0]
+        decoder_c = states[1]
+        # decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim).to(device)
 
         decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
         return decoder_output[0], decoder_output[1]
