@@ -194,7 +194,9 @@ def main():
                 logger.debug("Training the discriminator")                         
                 d_optimizer.zero_grad()
 
-                real_predictions = d(batch["past"])
+                real_traj_gt = torch.cat(batch["past"], batch["future"], dim=0)
+                # real_predictions = d(batch["past"])
+                real_predictions = d(real_traj_gt)
                 real_loss = bce_loss(real_predictions, true_labels)
                 # real_loss.backward()
                                                                                     

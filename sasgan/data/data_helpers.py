@@ -173,7 +173,9 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
 
             for j in range(4, 14):
                 # 10 frames in the future
-                future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
+                # future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
+                # for future, choose only x and y
+                future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][:, :2])
 
             # calculate background motion by subtracting two consecutive images
             image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]

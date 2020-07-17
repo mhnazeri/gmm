@@ -61,8 +61,13 @@ class Encoder(nn.Module):
             states = state_tuple
 
         # Embed the input data to the desired dimension using a cae encoder or a linear layer
-        embedder_inputs = inputs.view(-1, self._input_size)
-        embedded_features = self.embedder(embedder_inputs)
+        # changed by mohammad
+        embedded_features = []
+        for i in range(inputs.size()[0]): # sequence length
+            embedded_features.append(self.embedder(inputs[i]))
+        # embedder_inputs = inputs.view(-1, self._input_size)
+        # embedded_features = self.embedder(embedder_inputs)
+        embedded_features = torch.stack(embedded_features, dim=0)
 
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
         lstm_inputs = embedded_features.view(sequence_length, batch_size, self._embedding_dim)
@@ -479,7 +484,11 @@ class TrajectoryDiscriminator(nn.Module):
             num_layers=num_layers
         )
 
-        self.classifier = make_mlp(layers=[encoder_h_dim] + mlp_structure,
+        # self.classifier = make_mlp(layers=[encoder_h_dim] + mlp_structure,
+        #                            activation=mlp_activation,
+        #                            dropout=dropout,
+        #                            batch_normalization=batch_normalization)
+        self.classifier = make_mlp(layers=[102, 512, 256, 128, 1],
                                    activation=mlp_activation,
                                    dropout=dropout,
                                    batch_normalization=batch_normalization)
@@ -494,8 +503,9 @@ class TrajectoryDiscriminator(nn.Module):
                 self.classifier[i] = nn.utils.spectral_norm(layer)
 
     def forward(self, traj):
-        encoded_features = self.encoder(traj)
-        scores = self.classifier(encoded_features[0][0])
+        # encoded_features = self.encoder(traj)
+        # scores = self.classifier(encoded_features[0][0])
+        scores = self.classifier(traj)
         return scores
 
 if __name__ == '__main__':
