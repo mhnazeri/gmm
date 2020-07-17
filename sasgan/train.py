@@ -194,12 +194,15 @@ def main():
                 logger.debug("Training the discriminator")                         
                 d_optimizer.zero_grad()
 
-                real_predictions = d(batch["past"])
+                traj_gt = torch.cat(batch["past"], batch["future"], dim=0)
+                # real_predictions = d(batch["past"])
+                real_predictions = d(traj_gt)
                 real_loss = bce_loss(real_predictions, true_labels)
                 # real_loss.backward()
                                                                                     
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                fake_prediction = d(fake_traj.detach())
+                traj_fake = torch.cat(batch["past"], fake_traj.detach(), dim=0)
+                fake_prediction = d(traj_fake)
                 fake_loss = bce_loss(fake_prediction, fake_labels)
                 # fake_loss.backward()
 
@@ -222,7 +225,7 @@ def main():
             logger.debug("Training the generator")
             g_optimizer.zero_grad()
 
-            fake_prediction = d(fake_traj)
+            fake_prediction = d(torch.cat(batch["past"], fake_traj, dim=0))
 
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
