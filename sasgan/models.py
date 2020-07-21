@@ -26,10 +26,10 @@ class Encoder(nn.Module):
                  num_layers: int = 1):
         super(Encoder, self).__init__()
 
-        if embedder is not None:
-            self.embedder = embedder
-        else:
-            self.embedder = nn.Linear(input_size, embedding_dim)
+        # if embedder is not None:
+        #     self.embedder = embedder
+        # else:
+        #     self.embedder = nn.Linear(input_size, embedding_dim)
 
         self._num_layers = num_layers
         self._input_size = input_size
@@ -62,16 +62,16 @@ class Encoder(nn.Module):
 
         # Embed the input data to the desired dimension using a cae encoder or a linear layer
         # changed by mohammad
-        embedded_features = []
-        for i in range(inputs.size()[0]): # sequence length
-            embedded_features.append(self.embedder(inputs[i]))
+        # embedded_features = []
+        # for i in range(inputs.size()[0]): # sequence length
+        #     embedded_features.append(self.embedder(inputs[i]))
         # embedder_inputs = inputs.view(-1, self._input_size)
         # embedded_features = self.embedder(embedder_inputs)
-        embedded_features = torch.stack(embedded_features, dim=0)
+        # embedded_features = torch.stack(embedded_features, dim=0)
 
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
-        lstm_inputs = embedded_features.view(sequence_length, batch_size, self._embedding_dim)
-        _, states = self.encoder(lstm_inputs, states)
+        # lstm_inputs = embedded_features.view(sequence_length, batch_size, self._embedding_dim)
+        _, states = self.encoder(inputs, states)
         return states
 
 
@@ -265,10 +265,10 @@ class Decoder(nn.Module):
             # )
             # nn_layers = []
             self.hidden2pos.append(nn.Linear(hidden_dim, 128))
-            self.hidden2pos.append(nn.BatchNorm1d(dim_out))
+            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Tanh())
             self.hidden2pos.append(nn.Linear(128, 128))
-            self.hidden2pos.append(nn.BatchNorm1d(dim_out))
+            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Tanh())
             self.hidden2pos.append(nn.Linear(128, output_size))
             self.hidden2pos = nn.Sequential(*self.hidden2pos)
@@ -288,7 +288,7 @@ class Decoder(nn.Module):
             contains the required info from the past, both in the shape (num_layers, batch_size, embedding_dim)
         """
         decoder_output, state_tuple = self.decoder(fused_features.unsqueeze(0), state_tuple)
-        curr_features_rel = self.hidden2pos(decoder_output[0])
+        curr_features_rel = self.hidden2pos(decoder_output[-1])
 
         predicted_traj = last_features.clone()
         predicted_traj_rel = last_features_rel.clone()
@@ -395,6 +395,11 @@ class TrajectoryGenerator(nn.Module):
 
         super(TrajectoryGenerator, self).__init__()
 
+        if embedder is not None:
+            self.embedder = embedder
+        else:
+            self.embedder = nn.Linear(input_size, embedding_dim)
+
         self.context_features = ContextualFeatures(model_arch=context_feature_model_arch)
 
         self.gu = GenerationUnit(
@@ -431,6 +436,17 @@ class TrajectoryGenerator(nn.Module):
         gu_input = copy.deepcopy(obs_traj)
         gu_input_rel = copy.deepcopy(obs_traj_rel)
 
+        gu_input_rel = self.embedder(gu_input_rel)
+        embedded_features = []
+        for i in range(gu_input_rel.size()[0]): # sequence length
+            embedded_features.append(self.embedder(gu_input_rel[i]))
+        # embedder_inputs = inputs.view(-1, self._input_size)
+        # embedded_features = self.embedder(embedder_inputs)
+        gu_input_rel = torch.stack(embedded_features, dim=0)
+
+        # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
+        gu_input_rel = gu_input_rel.view(sequence_length, batch_size, -1)
+
         context_features = []
         for i in range(obs_length):
             context_features.append(self.context_features(frames[:, i]))
@@ -438,16 +454,16 @@ class TrajectoryGenerator(nn.Module):
         context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
         # Should be of the shape (batch_size, 1024, 12 * 12)
 
-        for _ in range(self._seq_len):
+        for i in range(self._seq_len):
             predicted_features, predicted_features_rel = self.gu(obs=gu_input,
                                                                  obs_rel=gu_input_rel,
                                                                  context_features=context_features_sum)
 
             # build the inputs for the next timestep
             final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
-            gu_input = final_prediction[-obs_length:]
+            gu_input = final_prediction[i:]
             final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
-            gu_input_rel = final_prediction_rel[-obs_length:]
+            gu_input_rel = final_prediction_rel[i:]
 
         return final_prediction[-self._seq_len:]
 
@@ -488,7 +504,7 @@ class TrajectoryDiscriminator(nn.Module):
         #                            activation=mlp_activation,
         #                            dropout=dropout,
         #                            batch_normalization=batch_normalization)
-        self.classifier = make_mlp(layers=[102, 512, 256, 128, 1],
+        self.classifier = make_mlp(layers=[72, 512, 256, 128, 1],
                                    activation=mlp_activation,
                                    dropout=dropout,
                                    batch_normalization=batch_normalization)

@@ -123,10 +123,11 @@ def make_cae(
     encoder.type(tensor_type).train()
     decoder.type(tensor_type).train()
 
-    optimizer = optim.Adam(
-        list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
+    optimizer = optim.RMSprop(
+        list(encoder.parameters()) + list(decoder.parameters()), momentum=0.9
     )
 
+    optimizer.zero_grad()
     logger.debug("Here is the encoder...")
     logger.debug(encoder)
 

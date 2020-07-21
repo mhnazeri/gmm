@@ -194,14 +194,19 @@ def main():
                 logger.debug("Training the discriminator")                         
                 d_optimizer.zero_grad()
 
-                traj_gt = torch.cat(batch["past"], batch["future"], dim=0)
+                d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+                d_input_future = batch["future"].permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+                # print(d_input_past.size(), d_input_future.size())            
+                traj_gt = torch.cat([d_input_past, d_input_future], dim=1)     
                 # real_predictions = d(batch["past"])
                 real_predictions = d(traj_gt)
                 real_loss = bce_loss(real_predictions, true_labels)
                 # real_loss.backward()
                                                                                     
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                traj_fake = torch.cat(batch["past"], fake_traj.detach(), dim=0)
+                d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+                d_input_future = fake_traj.detach().permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+                traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
                 fake_prediction = d(traj_fake)
                 fake_loss = bce_loss(fake_prediction, fake_labels)
                 # fake_loss.backward()
@@ -225,7 +230,10 @@ def main():
             logger.debug("Training the generator")
             g_optimizer.zero_grad()
 
-            fake_prediction = d(torch.cat(batch["past"], fake_traj, dim=0))
+            d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+            d_input_future = fake_traj.permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+            traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
+            fake_prediction = d(traj_fake)
 
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
