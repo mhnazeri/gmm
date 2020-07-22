@@ -2,10 +2,12 @@
 import os
 import argparse
 import random
+from collections import defaultdict
 import numpy as np
 from PIL import Image
 import ujson as json
 import torch
+from torch import Tensor
 from torchvision import transforms
 
 
@@ -28,12 +30,13 @@ def read_file(file: str, feature: str = None):
 
     if feature:
         return data, features, appears
-
+    print(appears)
     return data, appears
 
 
-def create_feature_matrix(file):
+def create_feature_matrix(file, min_frames:int = 10):
     datum, timestamps, appears = read_file(file, "timestamp")
+    # print(len(datum), len(appears))
     num_frames = len(timestamps) if len(timestamps) < 40 else 40
     ego = []
     agents = np.zeros((len(datum[-1]), 520))
@@ -42,8 +45,9 @@ def create_feature_matrix(file):
     appears = sorted(appears, key=lambda x: x[2] - x[1], reverse=True)
     num = 0
     for key, start, stop in appears:
-        for i in range(stop - start):
-            if datum[-1][key][i]["movable"] != 0:
+        if stop - start >= min_frames:
+            for i in range(stop - start):
+                # if datum[-1][key][i]["movable"] != 0:
                 agent_data = datum[-1][key][i]["translation"]
                 agent_data.extend(datum[-1][key][i]["rotation"])
                 agent_data.extend(datum[-1][key][i]["velocity"])
@@ -52,7 +56,7 @@ def create_feature_matrix(file):
                 # print(f"{key}, start: {start}, stop: {stop}")
                 # agents[int(key.split("_")[-1]), (start * 14) + (i * 14): (start + 1) * 14 + (i * 14)] = np.array(agent_data, dtype=np.float64)
                 agents[num, (start * 13) + (i * 13): (start + 1) * 13 + (i * 13)] = np.array(agent_data)
-        num += 1
+            num += 1
 
     for id in range(num_frames):
         # ego vehicle location
@@ -107,8 +111,15 @@ def create_feature_matrix_for_viz(file):
     return datum, calibrated_features
 
 
+def cal_distance(tensor: torch.Tensor) -> torch.Tensor:
+    pivot = tensor[0]
+    distance = (tensor - pivot).pow(2)
+    _, indices = torch.sort(distance, dim=0)
+    return indices[:, 0]
+
+
 def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
-                       save_dir: str, arch: str="overfeat"):
+                       save_dir: str, arch: str="overfeat", min_frames:int = 10):
     """save each train sample on hdd"""
     if arch == "overfeat":
         transform = transforms.Compose([
@@ -141,7 +152,7 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
 
     for file in files:
         # read lidar and camera data locations
-        lidar_address, camera_address = [], [] # read_file(file)
+        # lidar_address, camera_address = [], [] # read_file(file)
         with open(file, "r") as f:
             _data = json.load(f)
 
@@ -153,7 +164,7 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
             lidar_address.append(ego[i]["lidar"])
             camera_address.append(ego[i]["camera"])
         # for each file (scene), creates corresponding matrix
-        features = create_feature_matrix(file)
+        features = create_feature_matrix(file, min_frames=min_frames)
         # create zero rows to reach the max agent number
         # dummy = torch.zeros(max_agent - len(features), 520)
         # features = torch.cat((features, dummy), 0)
@@ -164,10 +175,11 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
             past = []
             future = []
             image = []
-
+            indices = cal_distance(features[:, start_stop[stamp][0]: start_stop[stamp][1]])
             for j in range(4):
                 # 4 frames in the past
-                past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
+                # temp = features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]]
+                past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices])
                 # each frame has an image
                 image.append(transform(Image.open(os.path.join(nuscenes_root, camera_address[stamp + j]))))
 
@@ -175,7 +187,7 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
                 # 10 frames in the future
                 # future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
                 # for future, choose only x and y
-                future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][:, :2])
+                future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices, :2])
 
             # calculate background motion by subtracting two consecutive images
             image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
@@ -186,7 +198,7 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
             rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
             # copy velocity and size from real past to relative past tensor
             for i in range(3):
-                rel_past[i][8:] = past[i + 1][8:]
+                rel_past[i][7:] = past[i + 1][7:]
 
             # if frame is at the beginning of a scene, add zero
             if stamp == 0:
@@ -194,18 +206,31 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
                 image.insert(0, torch.zeros_like(image[0]))
             else:
                 temp = past[0] - datum["past"]
-                temp[8:] = past[0][8:]
+                temp[7:] = past[0][7:]
                 rel_past.insert(0, temp)
                 image.insert(0, image[0] - datum["motion"])
 
+            # removing zero frames
+            # temp_past = torch.stack(past, dim=0)
+
+            # not_zero_frames = torch.where(temp_past[:].sum(axis=2) != 0)
+            # temp_past = temp_past[:, not_zero_frames]
+            # print(not_zero_frames)
+            # print(temp_past.size())
             # hold the info of the last frame of previos sample
             datum = {}
             datum["past"] = past[-1]
             datum["motion"] = image[-1]
+
             data["past"] = torch.stack(past, dim=0)
+            # rel_past = torch.stack(rel_past, dim=0)
             data["rel_past"] = torch.stack(rel_past, dim=0)
             data["motion"] = image
+            # future = torch.stack(future, dim=0)
             data["future"] = torch.stack(future, dim=0)
+            rel_future = torch.cat([data["past"][-1, :, :2].unsqueeze(0), data["future"]], dim=0 )
+            rel_future = rel_future[1:, :, :] - rel_future[:-1, :, :]
+            data["rel_future"] = rel_future
 
             # save data on hard
             torch.save(data, os.path.join(save_dir, f"{index}.pt"))
@@ -255,7 +280,9 @@ if __name__ == "__main__":
     # parser.add_argument('--portion', dest='portion', type=float, default=0.1, help='what percentage of values should be used for testing')
     # parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
     parser.add_argument('--arch', dest='arch', type=str, default="overfeat", help='feature extractor model architecture')
+    parser.add_argument('--min_frames', dest='min_frames', type=int, default=10,
+                        help='minimum number of frames that an agent should be present')
     args = parser.parse_args()
-    save_train_samples(args.nuscenes, ".", args.source, args.save_dir, args.arch)
+    save_train_samples(args.nuscenes, ".", args.source, args.save_dir, args.arch, args.min_frames)
     print("Saving samples is completed!")
     # move_samples(args.source, args.dest, args.portion, args.seed)

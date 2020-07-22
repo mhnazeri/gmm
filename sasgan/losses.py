@@ -9,6 +9,8 @@ def bce_loss(input, target):
     :return: The binary cross entropy loss
     """
     neg_abs = -input.abs()
+    # focal loss
+    # loss = input.clamp(min=0) - input * target + ((neg_abs.exp()).pow(2) * (1 + neg_abs.exp()).log())
     loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
     return loss.mean()
 
@@ -41,7 +43,7 @@ def bce_loss(input, target):
 #     return loss_real + loss_fake
 
 
-def displacement_error(pred_traj, pred_traj_gt, consider_ped=None, output_size=7):
+def displacement_error(pred_traj, pred_traj_gt, consider_ped=None):
     """
     :param pred_traj: Tensor of shape (seq_len, batch, 13). Predicted trajectory.
     :param pred_traj_gt: Tensor of shape (seq_len, batch, 13). Ground truth
@@ -51,17 +53,17 @@ def displacement_error(pred_traj, pred_traj_gt, consider_ped=None, output_size=7
              the loss tensor to be further used in qualitative results
     """
     batch_size = pred_traj.size(1)
-    loss = pred_traj_gt.permute(1, 0, 2)[:, :, :output_size] - pred_traj.permute(1, 0, 2)[:, :, :output_size]
+    loss = pred_traj_gt.permute(1, 0, 2) - pred_traj.permute(1, 0, 2)
     loss = loss ** 2
     if consider_ped is not None:
         loss = torch.sqrt(loss.sum(dim=2)).sum(dim=1) * consider_ped
     else:
         loss = torch.sqrt(loss.sum(dim=2)).sum(dim=1)
+    # 10 is the prediction len
+    return torch.sum(loss) / (batch_size * 10), loss
 
-    return torch.sum(loss) / batch_size, loss
 
-
-def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None, output_size=7):
+def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None):
     """
     :param pred_pos: Tensor of shape (batch, 13). Predicted last pos.
     :param pred_pos_gt: Tensor of shape (batch, 13). Groudtruth last pos
@@ -70,7 +72,7 @@ def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None, output_si
              the loss tensor to be further used in qualitative results
     """
     batch_size = pred_pos.size(0)
-    loss = pred_pos_gt[:, :output_size] - pred_pos[:, :output_size]
+    loss = pred_pos_gt - pred_pos
     loss = loss ** 2
     if consider_ped is not None:
         loss = torch.sqrt(loss.sum(dim=1)) * consider_ped
@@ -80,7 +82,7 @@ def final_displacement_error(pred_pos, pred_pos_gt, consider_ped=None, output_si
     return torch.sum(loss) / batch_size, loss
 
 
-def msd_error(pred_traj, pred_traj_gt, consider_ped=None, output_size=7):
+def msd_error(pred_traj, pred_traj_gt, consider_ped=None):
     """
     :param pred_traj: Tensor of shape (seq_len, batch, 13). Predicted trajectory.
     :param pred_traj_gt: Tensor of shape (seq_len, batch, 13). Ground truth
@@ -90,14 +92,14 @@ def msd_error(pred_traj, pred_traj_gt, consider_ped=None, output_size=7):
              the loss tensor to be further used in qualitative results
     """
     batch_size = pred_traj.size(1)
-    loss = (pred_traj_gt.permute(1, 0, 2)[:, :, :output_size] - pred_traj.permute(1, 0, 2)[:, :, :output_size]).pow(2)
+    loss = (pred_traj_gt.permute(1, 0, 2) - pred_traj.permute(1, 0, 2)).pow(2)
 
     if consider_ped is not None:
         loss = loss.sum(dim=2).sum(dim=1) * consider_ped
     else:
         loss = loss.sum(dim=2).sum(dim=1)
-
-    return torch.sum(loss) / batch_size, loss
+    # 10 is the prediction len
+    return torch.sum(loss) / (batch_size * 10), loss
 
 
 def cae_loss(output_encoder, outputs, inputs, device, lamda=1e-4):

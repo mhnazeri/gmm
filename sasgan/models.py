@@ -48,8 +48,8 @@ class Encoder(nn.Module):
         :param inputs: A tensor of the shape (sequence_length, batch, input_size)
         :return: A tensor of the shape (self.num_layers, batch, self.encoder_h_dim)
         """
-        sequence_length = inputs.shape[0]
-        batch_size = inputs.shape[1]
+        # sequence_length = inputs.shape[0]
+        # batch_size = inputs.shape[1]
 
 
         # Check the integrity of the shapes
@@ -83,7 +83,7 @@ class ContextualFeatures(nn.Module):
         Networks that can be used for feature extraction are:
             overfeat: returned matrix is 1024*12*12
     """
-    def __init__(self, model_arch: str="overfeat", pretrained: bool=False):
+    def __init__(self, model_arch: str="overfeat", pretrained: bool=True, refine: bool=True):
         super(ContextualFeatures, self).__init__()
 
         if model_arch == "overfeat":
@@ -119,7 +119,10 @@ class ContextualFeatures(nn.Module):
                 elif isinstance(layer, nn.ReLU):
                     vgg[i] = nn.LeakyReLU(inplace=True)
 
-            if pretrained:
+            if refine:
+                for param in vgg.parameters():
+                    param.requires_grad = True
+            else:
                 for param in vgg.parameters():
                     param.requires_grad = False
 
@@ -165,7 +168,7 @@ class Fusion(nn.Module):
         self.fuse_context = nn.LSTM(input_size=144, hidden_size=hidden_size)
 
         # Todo: fix the dimension as input
-        self.fuse = nn.Sequential(nn.Linear(hidden_size * 2, 256),
+        self.fuse = nn.Sequential(nn.Linear(hidden_size * 2, pool_dim),
                                     # nn.MaxPool1d(kernel_size=2, stride=2),
                                     nn.Tanh())
 
@@ -265,11 +268,11 @@ class Decoder(nn.Module):
             # )
             # nn_layers = []
             self.hidden2pos.append(nn.Linear(hidden_dim, 128))
-            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Tanh())
+            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Linear(128, 128))
-            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Tanh())
+            self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Linear(128, output_size))
             self.hidden2pos = nn.Sequential(*self.hidden2pos)
 
@@ -291,9 +294,9 @@ class Decoder(nn.Module):
         curr_features_rel = self.hidden2pos(decoder_output[-1])
 
         predicted_traj = last_features.clone()
-        predicted_traj_rel = last_features_rel.clone()
+        predicted_traj_rel = last_features_rel
         predicted_traj[:, :self._output_size] += curr_features_rel
-        predicted_traj_rel[:, :self._output_size] = curr_features_rel
+        predicted_traj_rel = curr_features_rel
 
         return predicted_traj, predicted_traj_rel, state_tuple
 
@@ -431,12 +434,11 @@ class TrajectoryGenerator(nn.Module):
         """
         batch_size = obs_traj.shape[1]
         obs_length = obs_traj.shape[0]
-        final_prediction = obs_traj
-        final_prediction_rel = obs_traj_rel
+        final_prediction_rel = []
         gu_input = copy.deepcopy(obs_traj)
         gu_input_rel = copy.deepcopy(obs_traj_rel)
 
-        gu_input_rel = self.embedder(gu_input_rel)
+        # gu_input_rel = self.embedder(gu_input_rel)
         embedded_features = []
         for i in range(gu_input_rel.size()[0]): # sequence length
             embedded_features.append(self.embedder(gu_input_rel[i]))
@@ -445,27 +447,35 @@ class TrajectoryGenerator(nn.Module):
         gu_input_rel = torch.stack(embedded_features, dim=0)
 
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
-        gu_input_rel = gu_input_rel.view(sequence_length, batch_size, -1)
+        gu_input_rel = gu_input_rel.view(obs_length, batch_size, -1)
 
         context_features = []
         for i in range(obs_length):
             context_features.append(self.context_features(frames[:, i]))
 
-        context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
         # Should be of the shape (batch_size, 1024, 12 * 12)
-
+        context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
+        next_gu_rel = gu_input_rel.clone()
         for i in range(self._seq_len):
             predicted_features, predicted_features_rel = self.gu(obs=gu_input,
-                                                                 obs_rel=gu_input_rel,
+                                                                 obs_rel=next_gu_rel,
                                                                  context_features=context_features_sum)
 
             # build the inputs for the next timestep
-            final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
-            gu_input = final_prediction[i:]
-            final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
-            gu_input_rel = final_prediction_rel[i:]
+            gu_input_rel = torch.cat([gu_input_rel, predicted_features_rel.unsqueeze(0)], dim=0)
+            next_gu_rel = gu_input_rel[i:].clone()
+            final_prediction_rel.append(predicted_features_rel)
+            # final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
+            # gu_input = final_prediction[i:]
+            # final_prediction_rel = torch.cat([final_prediction_rel] + [predicted_features_rel.unsqueeze(0)], dim=0)
+            # gu_input_rel = final_prediction_rel[i:]
+            
 
-        return final_prediction[-self._seq_len:]
+        # final_prediction = gu_input_rel[-self._seq_len:]
+        # return final_prediction[-self._seq_len:]
+        output_rel = torch.stack(final_prediction_rel, dim=0)
+        # output = relative_to_abs(output_rel, obs_traj[-1, :, :2])
+        return output_rel
 
 ##################################################################################
 #                               GAN Discriminator
@@ -477,10 +487,11 @@ class TrajectoryDiscriminator(nn.Module):
                  embedding_dim: int = 7,
                  num_layers: int = 1,
                  encoder_h_dim: int = 64,
-                 mlp_structure: list = [64, 128, 1],
-                 mlp_activation: str = "Relu",
+                 mlp_structure: list = [72, 512, 256, 128],
+                 activation: str = "Relu",
                  batch_normalization: bool = True,
-                 dropout: float = 0.0):
+                 dropout: float = 0.0,
+                 spectral_norm: bool = True):
         """
         :param embedder: if not None, the cae_encoder will be used for embedding otherwise a linear_layer
         :param embedding_dim: The dimension that the input data will be converted to
@@ -500,28 +511,64 @@ class TrajectoryDiscriminator(nn.Module):
             num_layers=num_layers
         )
 
-        # self.classifier = make_mlp(layers=[encoder_h_dim] + mlp_structure,
-        #                            activation=mlp_activation,
-        #                            dropout=dropout,
-        #                            batch_normalization=batch_normalization)
-        self.classifier = make_mlp(layers=[72, 512, 256, 128, 1],
-                                   activation=mlp_activation,
-                                   dropout=dropout,
-                                   batch_normalization=batch_normalization)
+        self.hidden_dim = encoder_h_dim                                        
+        # because past and future has different dimensions and we want to keep their temporal relation
+        self.encoder_past = nn.LSTM(13, encoder_h_dim)                         
+        self.encoder_future = nn.LSTM(2, encoder_h_dim)                        
+        self.encoder_fuse = nn.LSTM(encoder_h_dim, encoder_h_dim)
+
+        nn_layers = []
+        if mlp_structure[-1] != encoder_h_dim:
+            mlp_structure.insert(0, encoder_h_dim)
+            
+        for dim_in, dim_out in zip(mlp_structure[:-1], mlp_structure[1:]):
+            if spectral_norm:
+                nn_layers.append(nn.utils.spectral_norm(nn.Linear(dim_in, dim_out)))
+            else:
+                nn_layers.append(nn.Linear(dim_in, dim_out))
+            if activation == "Relu":
+                nn_layers.append(nn.ReLU())
+            elif activation == "LeakyRelu":
+                nn_layers.append(nn.LeakyReLU())
+            elif activation == "Sigmoid":
+                nn_layers.append(nn.Sigmoid())
+            elif activation == "Tanh":
+                nn_layers.append(nn.Tanh())
+            elif activation == "ELU":
+                nn_layers.append(nn.ELU())
+            if batch_normalization and dim_out != mlp_structure[-1]:
+                nn_layers.append(nn.BatchNorm1d(dim_out))
+            if dropout > 0:
+                nn_layers.append(nn.Dropout(p=dropout))
+
+        nn_layers.append(nn.Linear(dim_out, 1))
+
+        self.classifier = nn.Sequential(*nn_layers)
 
         # add spectral normalization for linear layer of the discriminator
-        for i, layer in enumerate(self.encoder.children()):
-            if isinstance(layer, nn.Linear):
-                self.encoder[i] = nn.utils.spectral_norm(layer)
+        # for i, layer in enumerate(self.encoder.children()):
+        #     if isinstance(layer, nn.Linear):
+        #         self.encoder[i] = nn.utils.spectral_norm(layer)
 
-        for i, layer in enumerate(self.classifier.children()):
-            if isinstance(layer, nn.Linear):
-                self.classifier[i] = nn.utils.spectral_norm(layer)
+        # for i, layer in enumerate(self.classifier.children()):
+        #     if isinstance(layer, nn.Linear):
+        #         self.classifier[i] = nn.utils.spectral_norm(layer)
 
-    def forward(self, traj):
+    def init_hidden(self, batch):                                              
+        return (                                                               
+            torch.zeros(1, batch, self.hidden_dim).to(device),                                                                                           
+            torch.zeros(1, batch, self.hidden_dim).to(device)                  
+        )
+
+    def forward(self, traj_past, traj_future):
         # encoded_features = self.encoder(traj)
         # scores = self.classifier(encoded_features[0][0])
-        scores = self.classifier(traj)
+        # scores = self.classifier(traj)
+        # return scores
+        _, (hidden_past, c_past) = self.encoder_past(traj_past, None)          
+        _, (hidden_future, _) = self.encoder_future(traj_future, (hidden_past, c_past))
+        _, hidden = self.encoder_fuse(torch.cat([hidden_past, hidden_future], dim=0), self.init_hidden(traj_past.size()[1]))
+        scores = self.classifier(hidden[0].view(-1, self.hidden_dim))          
         return scores
 
 if __name__ == '__main__':

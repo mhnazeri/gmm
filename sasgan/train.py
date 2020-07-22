@@ -1,14 +1,15 @@
-# Ready packages
+import os
+import logging
+import random
+import sys
+import time
+
 import torch
 import argparse
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import numpy as np
-import logging
-import random
-import os
 
-# Custom defined packages
 from data.loader import *
 from losses import bce_loss, displacement_error, final_displacement_error, msd_error
 from utils import *
@@ -74,6 +75,7 @@ def get_cae():
 
 def main():
     cae_encoder, cae_decoder = get_cae()
+    max_agents = int(TRAINING["use_cae_encoder"])
     logger.info("Preparing the dataloader for the main model...")
 
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
@@ -86,7 +88,7 @@ def main():
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         logger.info("Using the CAE encoder...")
-        embedder = cae_encoder
+        embedder = cae_encoder.requires_grad_(True)
 
     logger.info("Constructing the GAN...")
 
@@ -118,7 +120,7 @@ def main():
         num_layers=int(TRAINING["num_layers"]),
         encoder_h_dim=int(DISCRIMINATOR["encoder_h_dim"]),
         mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
-        mlp_activation=DISCRIMINATOR["mlp_activation"],
+        activation=DISCRIMINATOR["mlp_activation"],
         batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
         dropout=float(DISCRIMINATOR["dropout"])
         )
@@ -194,20 +196,24 @@ def main():
                 logger.debug("Training the discriminator")                         
                 d_optimizer.zero_grad()
 
-                d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
-                d_input_future = batch["future"].permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
-                # print(d_input_past.size(), d_input_future.size())            
-                traj_gt = torch.cat([d_input_past, d_input_future], dim=1)     
+                # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+                # d_input_future = batch["future"].permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+                # distort data to make d more robust
+                traj_gt_past_rel = batch["rel_past"] * torch.randn_like(batch["rel_past"])
+                traj_gt_future_rel = batch["rel_future"] * torch.randn_like(batch["rel_future"])         
+                # traj_gt = torch.cat([d_input_past, d_input_future], dim=1)     
                 # real_predictions = d(batch["past"])
-                real_predictions = d(traj_gt)
+                # add some noise to real data to confuse discriminator
+                # traj_gt = traj_gt * torch.randn_like(traj_gt)
+                real_predictions = d(traj_gt_past_rel, traj_gt_future_rel)
                 real_loss = bce_loss(real_predictions, true_labels)
                 # real_loss.backward()
                                                                                     
                 fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
-                d_input_future = fake_traj.detach().permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
-                traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
-                fake_prediction = d(traj_fake)
+                # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+                # d_input_future = fake_traj.detach().permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+                # traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
+                fake_prediction = d(traj_gt_past_rel, traj_fake.detach())
                 fake_loss = bce_loss(fake_prediction, fake_labels)
                 # fake_loss.backward()
 
@@ -216,6 +222,7 @@ def main():
                 d_losses.append(d_loss.item())
 
                 summary_writer_discriminator.add_scalar("GAN_loss", d_loss, step)
+
                 if clipping_threshold_d > 0:
                     nn.utils.clip_grad_norm_(d.parameters(),
                                      clipping_threshold_d)
@@ -230,19 +237,28 @@ def main():
             logger.debug("Training the generator")
             g_optimizer.zero_grad()
 
-            d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
-            d_input_future = fake_traj.permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
-            traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
-            fake_prediction = d(traj_fake)
+            # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
+            # d_input_future_fake = fake_traj.permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
+            # traj_fake = torch.cat([d_input_past, d_input_future_fake], dim=1)
+            fake_prediction = d(batch["rel_past"], traj_fake)
 
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
             g_losses.append(g_loss.item())
 
+            # check if gradients of generator are changing and not exploding (>100)
+            for p in g.parameters():
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** (1. / 2)
+            logger.debug(f"Generator Grad Total Norm: {total_norm}")
+
             summary_writer_generator.add_scalar("GAN_loss", g_loss, step)
 
             if clipping_threshold_g > 0:
                 nn.utils.clip_grad_norm_(g.parameters(), clipping_threshold_g)
+
+            logger.debug(f"Generator Grad Total Norm: {check_grad_norm(g)}") 
 
             g_optimizer.step()
 
@@ -257,15 +273,22 @@ def main():
             g.eval()
             d.eval()
 
-            fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-            output_size = int(GENERATOR["output_size"])
-            ADE_loss = displacement_error(fake_traj, batch["future"], output_size)[0].item()
-            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][-1], output_size)[0].item()
+            torch.cuda.synchronize()
+            t1 = time.time()
+            fake_traj = g(batch["past"][:,:max_agents,:], batch["rel_past"][:,:max_agents,:], batch["motion"][:max_agents])
+            fake_traj = relative_to_abs(fake_traj, batch["past"][-1, :max_agents, :2])
+            torch.cuda.synchronize()
+            t2 = time.time()
+            logger.info(f"Trajectory Generation step took {t2 - t1}")
+
+            ADE_loss = displacement_error(fake_traj, batch["future"][:,:max_agents,:])[0].item()
+            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][:,:max_agents,:])[0].item()
 
             msd = []
             for _ in range(int(TRAINING["k_samples"])):
-                fake_traj = g(batch["past"], batch["rel_past"], batch["motion"])
-                msd.append(msd_error(fake_traj, batch["future"], output_size)[0].item())
+                fake_traj = g(batch["past"][:,:max_agents,:], batch["rel_past"][:,:max_agents,:], batch["motion"][:max_agents])
+                fake_traj = relative_to_abs(fake_traj, batch["past"][-1, :max_agents, :2])
+                msd.append(msd_error(fake_traj, batch["future"])[0].item())
 
             MSD_loss = min(msd)
 
@@ -310,5 +333,141 @@ def main():
                 logger.info(f"Saving the model(intervals)...")
                 torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
+
+def validate():
+    nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"], test=True)
+    data_loader = DataLoader(nuscenes_data,
+                             batch_size=int(TRAINING["batch_size"]),
+                             shuffle=True,
+                             collate_fn=default_collate)
+
+    embedder = None
+    cae_encoder, cae_decoder = get_cae()
+    if bool(GENERATOR["use_cae_encoder"]):
+        logger.info("Using the CAE encoder...")
+        embedder = cae_encoder.requires_grad_(True)
+
+    logger.info("Constructing the GAN...")
+
+    # Construct the models
+    g = TrajectoryGenerator(
+        embedder=embedder,
+        de_embedder=None,
+        embedding_dim=int(CAE["embedding_dim"]),
+        encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
+        decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
+        seq_length=int(GENERATOR["seq_length"]),
+        input_size=int(TRAINING["input_size"]),
+        output_size=int(GENERATOR["output_size"]),
+        decoder_mlp_structure=convert_str_to_list(GENERATOR["decoder_h2p_structure"]),
+        decoder_mlp_activation=str(GENERATOR["decoder_h2p_activation"]),
+        dropout=float(GENERATOR["dropout"]),
+        fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
+        fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
+        context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
+        num_layers=int(GENERATOR["num_layers"])
+    )
+    logger.debug("Here is the generator...")
+    logger.debug(g)
+
+    d = TrajectoryDiscriminator(
+        embedder=cae_encoder,
+        input_size=int(TRAINING["input_size"]),
+        embedding_dim=int(CAE["embedding_dim"]),
+        num_layers=int(TRAINING["num_layers"]),
+        encoder_h_dim=int(DISCRIMINATOR["encoder_h_dim"]),
+        mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
+        activation=DISCRIMINATOR["mlp_activation"],
+        batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
+        dropout=float(DISCRIMINATOR["dropout"])
+    )
+    logger.debug("Here is the discriminator...")
+    logger.debug(d)
+
+    # Initialize the weights
+    g.apply(init_weights)
+    d.apply(init_weights)
+
+    # Get the device type
+    device = get_device(logger)
+
+    clipping_threshold_d = int(TRAINING["gradient_clipping_d"])
+    clipping_threshold_g = int(TRAINING["gradient_clipping_g"])
+
+    # Transfer the models to gpu
+    g.to(device)
+    d.to(device)
+
+    # Change the tensor types to GPU if neccessary
+    tensor_type = get_tensor_type()
+    g.type(tensor_type)
+    d.type(tensor_type)
+
+    # defining the loss and optimizers for generator and discriminator
+    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
+    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
+
+    max_agents = int(TRAINING["use_cae_encoder"])
+    save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
+    loading_path = checkpoint_path(save_dir)
+    if loading_path is not None:
+        logger.info(f"Loading the main model...")
+        loaded_dictionary = torch.load(loading_path)
+        g.load_state_dict(loaded_dictionary["generator"])
+        d.load_state_dict(loaded_dictionary["discriminator"])
+        g_optimizer.load_state_dict(loaded_dictionary["g_optimizer"])
+        d_optimizer.load_state_dict(loaded_dictionary["d_optimizer"])
+        start_epoch = loaded_dictionary["epoch"] + 1
+        step = loaded_dictionary["step"]
+        best_ADE_loss = loaded_dictionary["best_ADE_loss"]
+
+        logger.info(f"Done loading the model in {loading_path}")
+    else:
+        logger.info(f"No saved checkpoint for GAN, Initializing...")
+        sys.exit(1)
+
+    for batch in data_loader:
+
+        with torch.no_grad():
+            logger.debug("Evaluating the model")
+            g.eval()
+            d.eval()
+
+            torch.cuda.synchronize()
+            t1 = time.time()
+            fake_traj = g(batch["past"][:, :max_agents, :], batch["rel_past"][:, :max_agents, :],
+                          batch["motion"][:max_agents])
+            fake_traj = relative_to_abs(fake_traj, batch["past"][-1, :max_agents, :2])
+            torch.cuda.synchronize()
+            t2 = time.time()
+            logger.info(f"Trajectory Generation step took {t2 - t1}")
+
+            ADE_loss = displacement_error(fake_traj, batch["future"][:, :max_agents, :])[0].item()
+            FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][:, :max_agents, :])[0].item()
+
+            msd = []
+            for _ in range(int(TRAINING["k_samples"])):
+                fake_traj = g(batch["past"][:, :max_agents, :], batch["rel_past"][:, :max_agents, :],
+                              batch["motion"][:max_agents])
+                fake_traj = relative_to_abs(fake_traj, batch["past"][-1, :max_agents, :2])
+                msd.append(msd_error(fake_traj, batch["future"])[0].item())
+
+            MSD_loss = min(msd)
+
+            if int(TRAINING["epochs"]) > 0:
+                epochs = int(TRAINING["epochs"])
+                logger.info(
+                    f"VALIDATION[]      "
+                    f"ADE_loss:{ADE_loss:8.2f}      "
+                    f"FDE_loss:{FDE_loss:8.2f}      "
+                    f"MSD_loss:{MSD_loss:8.2f}      ")
+
+
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train', default=True, action='store_true', help='train the model or test?')
+    args = parser.parse_args()
+    if args.train:
+        main()
+    else:
+        validate()
