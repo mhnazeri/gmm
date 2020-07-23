@@ -8,11 +8,16 @@ def bce_loss(input, target):
     :param target: The target tensor of shape [Btach_size]
     :return: The binary cross entropy loss
     """
-    neg_abs = -input.abs()
+    # neg_abs = -input.abs()
     # focal loss
     # loss = input.clamp(min=0) - input * target + ((neg_abs.exp()).pow(2) * (1 + neg_abs.exp()).log())
-    loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
-    return loss.mean()
+    # loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
+    bce = torch.nn.BCEWithLogitsLoss()
+    # sigmoid = torch.nn.Sigmoid()
+    loss = bce(input.squeeze(), target)
+
+    # return loss.mean()
+    return loss
 
 
 # def gan_g_loss(scores_fake):

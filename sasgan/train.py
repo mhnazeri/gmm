@@ -88,7 +88,10 @@ def main():
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         logger.info("Using the CAE encoder...")
-        embedder = cae_encoder.requires_grad_(True)
+        if GENERATOR["refine_CAE"] > 0:
+            embedder = cae_encoder.requires_grad_(True)
+        else:
+            embedder = cae_encoder
 
     logger.info("Constructing the GAN...")
 
@@ -304,6 +307,8 @@ def main():
                 f"FDE_loss:{FDE_loss:8.2f}      "
                 f"MSD_loss:{MSD_loss:8.2f}      ")
 
+        validate(g)
+
         summary_writer_validation.add_scalar("ADE_loss", ADE_loss, epoch)
         summary_writer_validation.add_scalar("FDE_loss", FDE_loss, epoch)
         summary_writer_validation.add_scalar("MSD_loss", MSD_loss, epoch)
@@ -334,104 +339,103 @@ def main():
                 torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
 
-def validate():
+def validate(g: TrajectoryGenerator):
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"], test=True)
     data_loader = DataLoader(nuscenes_data,
                              batch_size=int(TRAINING["batch_size"]),
                              shuffle=True,
                              collate_fn=default_collate)
+    if not G:
+        embedder = None
+        cae_encoder, cae_decoder = get_cae()
+        if bool(GENERATOR["use_cae_encoder"]):
+            logger.info("Using the CAE encoder...")
+            embedder = cae_encoder.requires_grad_(True)
 
-    embedder = None
-    cae_encoder, cae_decoder = get_cae()
-    if bool(GENERATOR["use_cae_encoder"]):
-        logger.info("Using the CAE encoder...")
-        embedder = cae_encoder.requires_grad_(True)
+        logger.info("Constructing the GAN...")
 
-    logger.info("Constructing the GAN...")
+        # Construct the models
+        g = TrajectoryGenerator(
+            embedder=embedder,
+            de_embedder=None,
+            embedding_dim=int(CAE["embedding_dim"]),
+            encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
+            decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
+            seq_length=int(GENERATOR["seq_length"]),
+            input_size=int(TRAINING["input_size"]),
+            output_size=int(GENERATOR["output_size"]),
+            decoder_mlp_structure=convert_str_to_list(GENERATOR["decoder_h2p_structure"]),
+            decoder_mlp_activation=str(GENERATOR["decoder_h2p_activation"]),
+            dropout=float(GENERATOR["dropout"]),
+            fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
+            fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
+            context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
+            num_layers=int(GENERATOR["num_layers"])
+        )
+        logger.debug("Here is the generator...")
+        logger.debug(g)
 
-    # Construct the models
-    g = TrajectoryGenerator(
-        embedder=embedder,
-        de_embedder=None,
-        embedding_dim=int(CAE["embedding_dim"]),
-        encoder_h_dim=int(GENERATOR["encoder_h_dim"]),
-        decoder_h_dim=int(GENERATOR["decoder_h_dim"]),
-        seq_length=int(GENERATOR["seq_length"]),
-        input_size=int(TRAINING["input_size"]),
-        output_size=int(GENERATOR["output_size"]),
-        decoder_mlp_structure=convert_str_to_list(GENERATOR["decoder_h2p_structure"]),
-        decoder_mlp_activation=str(GENERATOR["decoder_h2p_activation"]),
-        dropout=float(GENERATOR["dropout"]),
-        fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
-        fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
-        context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
-        num_layers=int(GENERATOR["num_layers"])
-    )
-    logger.debug("Here is the generator...")
-    logger.debug(g)
+        d = TrajectoryDiscriminator(
+            embedder=cae_encoder,
+            input_size=int(TRAINING["input_size"]),
+            embedding_dim=int(CAE["embedding_dim"]),
+            num_layers=int(TRAINING["num_layers"]),
+            encoder_h_dim=int(DISCRIMINATOR["encoder_h_dim"]),
+            mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
+            activation=DISCRIMINATOR["mlp_activation"],
+            batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
+            dropout=float(DISCRIMINATOR["dropout"])
+        )
+        logger.debug("Here is the discriminator...")
+        logger.debug(d)
 
-    d = TrajectoryDiscriminator(
-        embedder=cae_encoder,
-        input_size=int(TRAINING["input_size"]),
-        embedding_dim=int(CAE["embedding_dim"]),
-        num_layers=int(TRAINING["num_layers"]),
-        encoder_h_dim=int(DISCRIMINATOR["encoder_h_dim"]),
-        mlp_structure=convert_str_to_list(DISCRIMINATOR["mlp_structure"]),
-        activation=DISCRIMINATOR["mlp_activation"],
-        batch_normalization=bool(DISCRIMINATOR["batch_normalization"]),
-        dropout=float(DISCRIMINATOR["dropout"])
-    )
-    logger.debug("Here is the discriminator...")
-    logger.debug(d)
+        # Initialize the weights
+        g.apply(init_weights)
+        d.apply(init_weights)
 
-    # Initialize the weights
-    g.apply(init_weights)
-    d.apply(init_weights)
+        # Get the device type
+        device = get_device(logger)
 
-    # Get the device type
-    device = get_device(logger)
+        clipping_threshold_d = int(TRAINING["gradient_clipping_d"])
+        clipping_threshold_g = int(TRAINING["gradient_clipping_g"])
 
-    clipping_threshold_d = int(TRAINING["gradient_clipping_d"])
-    clipping_threshold_g = int(TRAINING["gradient_clipping_g"])
+        # Transfer the models to gpu
+        g.to(device)
+        d.to(device)
 
-    # Transfer the models to gpu
-    g.to(device)
-    d.to(device)
+        # Change the tensor types to GPU if neccessary
+        tensor_type = get_tensor_type()
+        g.type(tensor_type)
+        d.type(tensor_type)
 
-    # Change the tensor types to GPU if neccessary
-    tensor_type = get_tensor_type()
-    g.type(tensor_type)
-    d.type(tensor_type)
+        # defining the loss and optimizers for generator and discriminator
+        d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
+        g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
 
-    # defining the loss and optimizers for generator and discriminator
-    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
-    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
+        max_agents = int(TRAINING["use_cae_encoder"])
+        save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
+        loading_path = checkpoint_path(save_dir)
+        if loading_path is not None:
+            logger.info(f"Loading the main model...")
+            loaded_dictionary = torch.load(loading_path)
+            g.load_state_dict(loaded_dictionary["generator"])
+            d.load_state_dict(loaded_dictionary["discriminator"])
+            g_optimizer.load_state_dict(loaded_dictionary["g_optimizer"])
+            d_optimizer.load_state_dict(loaded_dictionary["d_optimizer"])
+            start_epoch = loaded_dictionary["epoch"] + 1
+            step = loaded_dictionary["step"]
+            best_ADE_loss = loaded_dictionary["best_ADE_loss"]
 
-    max_agents = int(TRAINING["use_cae_encoder"])
-    save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
-    loading_path = checkpoint_path(save_dir)
-    if loading_path is not None:
-        logger.info(f"Loading the main model...")
-        loaded_dictionary = torch.load(loading_path)
-        g.load_state_dict(loaded_dictionary["generator"])
-        d.load_state_dict(loaded_dictionary["discriminator"])
-        g_optimizer.load_state_dict(loaded_dictionary["g_optimizer"])
-        d_optimizer.load_state_dict(loaded_dictionary["d_optimizer"])
-        start_epoch = loaded_dictionary["epoch"] + 1
-        step = loaded_dictionary["step"]
-        best_ADE_loss = loaded_dictionary["best_ADE_loss"]
-
-        logger.info(f"Done loading the model in {loading_path}")
-    else:
-        logger.info(f"No saved checkpoint for GAN, Initializing...")
-        sys.exit(1)
+            logger.info(f"Done loading the model in {loading_path}")
+        else:
+            logger.info(f"No saved checkpoint for GAN, Initializing...")
+            sys.exit(1)
 
     for batch in data_loader:
 
         with torch.no_grad():
             logger.debug("Evaluating the model")
             g.eval()
-            d.eval()
 
             torch.cuda.synchronize()
             t1 = time.time()
@@ -440,7 +444,6 @@ def validate():
             fake_traj = relative_to_abs(fake_traj, batch["past"][-1, :max_agents, :2])
             torch.cuda.synchronize()
             t2 = time.time()
-            logger.info(f"Trajectory Generation step took {t2 - t1}")
 
             ADE_loss = displacement_error(fake_traj, batch["future"][:, :max_agents, :])[0].item()
             FDE_loss = final_displacement_error(fake_traj[-1], batch["future"][:, :max_agents, :])[0].item()
@@ -454,13 +457,12 @@ def validate():
 
             MSD_loss = min(msd)
 
-            if int(TRAINING["epochs"]) > 0:
-                epochs = int(TRAINING["epochs"])
-                logger.info(
-                    f"VALIDATION[]      "
-                    f"ADE_loss:{ADE_loss:8.2f}      "
-                    f"FDE_loss:{FDE_loss:8.2f}      "
-                    f"MSD_loss:{MSD_loss:8.2f}      ")
+            logger.info(
+                f"VALIDATION:      "
+                f"ADE_loss:{ADE_loss:8.2f}      "
+                f"FDE_loss:{FDE_loss:8.2f}      "
+                f"MSD_loss:{MSD_loss:8.2f}      "
+                f"Trajectory Generation step took {t2 - t1:8.2f}")
 
 
 if __name__ == '__main__':
