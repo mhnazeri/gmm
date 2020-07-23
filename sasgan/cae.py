@@ -2,25 +2,23 @@
 Implementation of Contractive Autoencoder to compress feature vector into
 latent feature vector
 """
-import matplotlib.pyplot as plt
+import os
+import logging
+import numpy as np
+
+import torch
 import torch.nn as nn
-from torch import load, save, tensor
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import torch
+
 from data.loader import CAEDataset
 from utils import *
-import seaborn as sns
-import logging
 from losses import cae_loss
-import os
-from numpy import inf, mean
+
 from torch.utils.tensorboard import SummaryWriter
-import numpy as np
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-sns.set(color_codes=True)
 
 class Encoder_Decoder(nn.Module):
     """Encoder network of CAE"""
@@ -83,13 +81,13 @@ def make_cae(
         activation: str = "Relu",
         learning_rate: float = 0.001,
         save_every_d_epochs: int = 50,
-        ignore_first_epochs: int = 300,
+        ignore_first_epochs: int = 300
         ):
     """
     The following function returns the required cae to be further used in the next sections of the model
     If there is any saved model of cae, It loads according to the loading strategy otherwise it just
         creates a model with the specified parameters and trains it from scratch.
-    The model will train even though there is any saved model until there are iteratioins specified, In order to just
+    The model will train even though there is any saved model until there are iterations specified, In order to just
         retrieve a saved model, you should set the epochs to zero in the config file
 
     :param dataloader_train: the training data iterator on Tensors with shape (batch_size, 520)
@@ -118,16 +116,14 @@ def make_cae(
     device = get_device(logger)
     encoder = encoder.to(device)
     decoder = decoder.to(device)
-
     tensor_type = get_tensor_type()
     encoder.type(tensor_type).train()
     decoder.type(tensor_type).train()
 
-    optimizer = optim.RMSprop(
-        list(encoder.parameters()) + list(decoder.parameters()), momentum=0.9
+    optimizer = optim.Adam(
+        list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate
     )
 
-    optimizer.zero_grad()
     logger.debug("Here is the encoder...")
     logger.debug(encoder)
 
@@ -138,7 +134,7 @@ def make_cae(
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
         logger.info(f"Loading the model in {loading_path}...")
-        saving_dictionary = load(loading_path)
+        saving_dictionary = torch.load(loading_path)
         encoder.load_state_dict(saving_dictionary["encoder"])
         decoder.load_state_dict(saving_dictionary["decoder"])
         optimizer.load_state_dict(saving_dictionary["optimizer"])
@@ -151,8 +147,8 @@ def make_cae(
     else:
         logger.info("No saved model for CAE, initializing...")
         start_epoch = 0
-        loss = tensor([0])
-        best_loss = inf
+        loss = torch.tensor([0])
+        best_loss = np.inf
         step = 0
         logger.debug("Done")
         encoder.apply(init_weights)
@@ -183,16 +179,14 @@ def make_cae(
 
             step += 1
 
-
-
             if torch.isnan(loss):
                 print("outputs_encoder", outputs_encoder)
                 print("outputs", outputs)
                 print("samples", samples)
                 break
 
-        summary_writer.add_scalar("cae_loss", mean(losses), epoch)
-        logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {mean(losses):.2f}")
+        summary_writer.add_scalar("cae_loss", np.mean(losses), epoch)
+        logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {np.mean(losses):.2f}")
 
         """
         The model will be saved in three circumstances: 
@@ -201,7 +195,7 @@ def make_cae(
           3. after the final iteration
         """
 
-        if (best_loss <= mean(losses) and epoch > ignore_first_epochs) or \
+        if (best_loss <= np.mean(losses) and epoch > ignore_first_epochs) or \
                 (epoch + 1) % save_every_d_epochs == 0 or \
                 (epoch + 1) == start_epoch + iterations:
             checkpoint = {
@@ -213,14 +207,14 @@ def make_cae(
                 "best_loss": best_loss,
                 "loss": loss,
             }
-            if best_loss <= mean(losses) and epoch > ignore_first_epochs:
+            if best_loss <= np.mean(losses) and epoch > ignore_first_epochs:
                 logger.info("Saving the model(lowest ADE loss)...")
-                best_loss = mean(losses)
-                save(checkpoint, save_dir + "/best.pt")
+                best_loss = np.mean(losses)
+                torch.save(checkpoint, save_dir + "/best.pt")
 
             else:
                 logger.info(f"Saving the model(intervals)...")
-                save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
+                torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
     encoder.requires_grad_(False)
     decoder.requires_grad_(False)
@@ -262,7 +256,7 @@ if __name__ == "__main__":
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),
-                 learning_rate=float(CAE["learning_rate"]),
+                 learning_ratefloat(CAE["learning_rate"]),
                  save_every_d_epochs=int(CAE["save_every_d_epochs"]),
                  ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 

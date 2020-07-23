@@ -49,7 +49,7 @@ class Encoder(nn.Module):
         :return: A tensor of the shape (self.num_layers, batch, self.encoder_h_dim)
         """
         # sequence_length = inputs.shape[0]
-        # batch_size = inputs.shape[1]
+        batch_size = inputs.shape[1]
 
 
         # Check the integrity of the shapes
@@ -166,8 +166,6 @@ class Fusion(nn.Module):
         # 3 modules that comprise the fusion
         # self.fuse_traj = nn.LSTM(input_size=92, hidden_size=hidden_size)
         self.fuse_context = nn.LSTM(input_size=144, hidden_size=hidden_size)
-
-        # Todo: fix the dimension as input
         self.fuse = nn.Sequential(nn.Linear(hidden_size * 2, pool_dim),
                                     # nn.MaxPool1d(kernel_size=2, stride=2),
                                     nn.Tanh())
@@ -270,9 +268,9 @@ class Decoder(nn.Module):
             self.hidden2pos.append(nn.Linear(hidden_dim, 128))
             self.hidden2pos.append(nn.Tanh())
             self.hidden2pos.append(nn.BatchNorm1d(128))
-            self.hidden2pos.append(nn.Linear(128, 128))
-            self.hidden2pos.append(nn.Tanh())
-            self.hidden2pos.append(nn.BatchNorm1d(128))
+            # self.hidden2pos.append(nn.Linear(128, 128))
+            # self.hidden2pos.append(nn.Tanh())
+            # self.hidden2pos.append(nn.BatchNorm1d(128))
             self.hidden2pos.append(nn.Linear(128, output_size))
             self.hidden2pos = nn.Sequential(*self.hidden2pos)
 
@@ -308,7 +306,7 @@ class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
     def __init__(self, embedder, de_embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 272):
+                 fusion_hidden_dim, fused_vector_length: int = 80):
 
         super(GenerationUnit, self).__init__()
 
@@ -375,8 +373,6 @@ class GenerationUnit(nn.Module):
         return decoder_output[0], decoder_output[1]
 
 
-
-
 class TrajectoryGenerator(nn.Module):
     """The GenerationUnit will be used to forecast for sequence_length"""
     def __init__(self,
@@ -394,7 +390,9 @@ class TrajectoryGenerator(nn.Module):
                  fusion_pool_dim:int = 64,
                  fusion_hidden_dim:int = 64,
                  context_feature_model_arch:str = "overfeat",
-                 num_layers: int = 1):
+                 num_layers: int = 1,
+                 pretrain: bool=True,
+                 refine:bool = True):
 
         super(TrajectoryGenerator, self).__init__()
 
@@ -403,7 +401,7 @@ class TrajectoryGenerator(nn.Module):
         else:
             self.embedder = nn.Linear(input_size, embedding_dim)
 
-        self.context_features = ContextualFeatures(model_arch=context_feature_model_arch)
+        self.context_features = ContextualFeatures(model_arch=context_feature_model_arch, pretrained=pretrain, refine=refine)
 
         self.gu = GenerationUnit(
             embedder=embedder,
@@ -435,8 +433,8 @@ class TrajectoryGenerator(nn.Module):
         batch_size = obs_traj.shape[1]
         obs_length = obs_traj.shape[0]
         final_prediction_rel = []
-        gu_input = copy.deepcopy(obs_traj)
-        gu_input_rel = copy.deepcopy(obs_traj_rel)
+        gu_input = obs_traj
+        gu_input_rel = obs_traj_rel
 
         # gu_input_rel = self.embedder(gu_input_rel)
         embedded_features = []
@@ -455,7 +453,7 @@ class TrajectoryGenerator(nn.Module):
 
         # Should be of the shape (batch_size, 1024, 12 * 12)
         context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
-        next_gu_rel = gu_input_rel.clone()
+        next_gu_rel = gu_input_rel
         for i in range(self._seq_len):
             predicted_features, predicted_features_rel = self.gu(obs=gu_input,
                                                                  obs_rel=next_gu_rel,
@@ -463,7 +461,7 @@ class TrajectoryGenerator(nn.Module):
 
             # build the inputs for the next timestep
             gu_input_rel = torch.cat([gu_input_rel, predicted_features_rel.unsqueeze(0)], dim=0)
-            next_gu_rel = gu_input_rel[i:].clone()
+            next_gu_rel = gu_input_rel[i:]
             final_prediction_rel.append(predicted_features_rel)
             # final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
             # gu_input = final_prediction[i:]

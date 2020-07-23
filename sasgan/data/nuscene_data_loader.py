@@ -270,7 +270,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('nuscenes', dest='nuscenes', type=str, help='set nuscenes directory')
     parser.add_argument('--source', dest='source', type=str, default="meta_data", help='source directory')
-    parser.add_argument('--dest', dest='dest', type=str, default="meta_data_test", help='destination directory')
+    parser.add_argument('--dest', dest='dest', type=str, default="meta_data_val", help='destination directory')
     parser.add_argument('--portion', dest='portion', type=float, default=0.01, help='what percentage of data should be used for testing')
     parser.add_argument('--seed', dest='seed', type=int, default=42, help='random seed')
 

@@ -75,7 +75,7 @@ def get_cae():
 
 def main():
     cae_encoder, cae_decoder = get_cae()
-    max_agents = int(TRAINING["use_cae_encoder"])
+    max_agents = int(TRAINING["max_agents"])
     logger.info("Preparing the dataloader for the main model...")
 
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"])
@@ -88,7 +88,7 @@ def main():
     embedder = None
     if bool(GENERATOR["use_cae_encoder"]):
         logger.info("Using the CAE encoder...")
-        if GENERATOR["refine_CAE"] > 0:
+        if int(GENERATOR["refine_CAE"]) > 0:
             embedder = cae_encoder.requires_grad_(True)
         else:
             embedder = cae_encoder
@@ -216,7 +216,7 @@ def main():
                 # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
                 # d_input_future = fake_traj.detach().permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
                 # traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
-                fake_prediction = d(traj_gt_past_rel, traj_fake.detach())
+                fake_prediction = d(traj_gt_past_rel, fake_traj.detach())
                 fake_loss = bce_loss(fake_prediction, fake_labels)
                 # fake_loss.backward()
 
@@ -243,7 +243,7 @@ def main():
             # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
             # d_input_future_fake = fake_traj.permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
             # traj_fake = torch.cat([d_input_past, d_input_future_fake], dim=1)
-            fake_prediction = d(batch["rel_past"], traj_fake)
+            fake_prediction = d(batch["rel_past"], fake_traj)
 
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
@@ -370,7 +370,9 @@ def validate(g: TrajectoryGenerator):
             fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
             fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
             context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
-            num_layers=int(GENERATOR["num_layers"])
+            num_layers=int(GENERATOR["num_layers"]),
+            pretrain=bool(GENERATOR["pretrain_vgg"]),
+            refine=bool(GENERATOR["refine_vgg"])
         )
         logger.debug("Here is the generator...")
         logger.debug(g)

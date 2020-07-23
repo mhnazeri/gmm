@@ -17,7 +17,7 @@ class NuSceneDataset(Dataset):
     def __init__(self,  root_dir: str, test: bool = False):
         """str root_dir: train_data root directory"""
         if test:
-            data = os.path.join(root_dir, "test_data")
+            data = os.path.join(root_dir, "val_data")
         else:
             data = os.path.join(root_dir, "train_data")
 
