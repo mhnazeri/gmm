@@ -224,10 +224,11 @@ class Fusion(nn.Module):
         #     (noise, real_past, fused_features),
         #     1)
 
-        fused_features_hidden = torch.cat(
-            (noise, fused_features),
-            1)
-        return fused_features_hidden
+        # fused_features_hidden = torch.cat(
+        #     (noise, fused_features),
+        #     1)
+        fused_features = torch.randn_like(fused_features) * fused_features
+        return fused_features
 
 ##################################################################################
 #                                    Decoder

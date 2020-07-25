@@ -38,14 +38,6 @@ class Encoder_Decoder(nn.Module):
         # self.n_outputs = output_size
         # self.n_latent = latent_dimension
 
-        if Encoder:
-            structure.insert(0, input_size)
-            structure.append(latent_dimension)
-
-        else:
-            structure.insert(0, latent_dimension)
-            structure.append(output_size)
-
         if activation == "Sigmoid" \
                 or activation == "Tanh" \
                 or activation == "LeakyRelu" \
@@ -55,12 +47,48 @@ class Encoder_Decoder(nn.Module):
         else:
             raise "{} function is not supported".format(activation)
 
-        self.mlp = make_mlp(
-            layers=structure,
-            activation=activation,
-            dropout=dropout,
-            batch_normalization=batch_normalization
-        )
+        if Encoder:
+            structure.insert(0, input_size)
+
+        else:
+            structure.insert(0, latent_dimension)
+
+        # self.mlp = make_mlp(
+        #     layers=structure,
+        #     activation=activation,
+        #     dropout=dropout,
+        #     batch_normalization=batch_normalization
+        # )
+
+        nn_layers = []
+        for dim_in, dim_out in zip(structure[:-1], structure[1:]):
+            nn_layers.append(nn.Linear(dim_in, dim_out))
+            if activation == "Relu":
+                nn_layers.append(nn.ReLU())
+            elif activation == "LeakyRelu":
+                nn_layers.append(nn.LeakyReLU())
+            elif activation == "Sigmoid":
+                nn_layers.append(nn.Sigmoid())
+            elif activation == "Tanh":
+                nn_layers.append(nn.Tanh())
+            elif activation == "ELU":
+                nn_layers.append(nn.ELU())
+            if batch_normalization and dim_out != layers[-1]:
+                nn_layers.append(nn.BatchNorm1d(dim_out))
+            if dropout > 0:
+                nn_layers.append(nn.Dropout(p=dropout))
+
+        if Encoder:
+            # structure.insert(0, input_size)
+            # structure.append(latent_dimension)
+            nn_layers.append(nn.Linear(structure[-1], latent_dimension))
+
+        else:
+            # structure.insert(0, latent_dimension)
+            # structure.append(output_size)
+            nn_layers.append(nn.Linear(structure[-1], output_size))
+
+        self.mlp = nn.Sequential(*nn_layers)
 
     def forward(self, x):
         return self.mlp(x)
@@ -256,7 +284,7 @@ if __name__ == "__main__":
                  latent_dim=latent_dim,
                  iterations=int(CAE["epochs"]),
                  activation=str(CAE["activation"]),
-                 learning_ratefloat(CAE["learning_rate"]),
+                 learning_rate=float(CAE["learning_rate"]),
                  save_every_d_epochs=int(CAE["save_every_d_epochs"]),
                  ignore_first_epochs=int(CAE["ignore_first_epochs"]))
 
