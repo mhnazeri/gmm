@@ -188,7 +188,7 @@ def main():
                 batch[key] = batch[key].to(device)
 
             fake_labels = torch.ones(batch["past"].shape[1]).to(device) * random.uniform(0, 0.2)
-            true_labels = torch.ones(batch["past"].shape[1]).to(device) * random.uniform(0.7, 1.2)
+            true_labels = torch.ones(batch["past"].shape[1]).to(device) * random.uniform(0.8, 1.0)
             ###################################################################
             #                 training the discriminator                       
             ###################################################################
@@ -331,7 +331,7 @@ def main():
                 torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
 
 
-def validate(g: TrajectoryGenerator, device=None):
+def validate(g, device=None):
     max_agents = int(TRAINING["max_agents"])
     nuscenes_data = NuSceneDataset(root_dir=DIRECTORIES["train_data"], test=True)
     data_loader = DataLoader(nuscenes_data,
@@ -343,7 +343,7 @@ def validate(g: TrajectoryGenerator, device=None):
         cae_encoder, cae_decoder = get_cae()
         if bool(GENERATOR["use_cae_encoder"]):
             logger.info("Using the CAE encoder...")
-            embedder = cae_encoder.requires_grad_(True)
+            embedder = cae_encoder
 
         logger.info("Constructing the GAN...")
 
@@ -434,8 +434,8 @@ def validate(g: TrajectoryGenerator, device=None):
         f"VALIDATION:      "
         f"ADE_loss:{np.mean(ade_loss_list):8.2f}      "
         f"FDE_loss:{np.mean(fde_loss_list):8.2f}      "
-        f"MSD_loss:{np.mean(msd_loss_list):8.2f}      "
-        f"MSD_loss:{np.std(msd_loss_list):8.2f}      ")
+        f"MSD_loss (mean):{np.mean(msd_loss_list):8.2f}      "
+        f"MSD_loss (var):{np.std(msd_loss_list):8.2f}      ")
         # f"Trajectory Generation step took:{t2 - t1:8.2f}")
 
 
@@ -446,4 +446,4 @@ if __name__ == '__main__':
     if args.train:
         main()
     else:
-        validate(None, None)
+        validate(None)

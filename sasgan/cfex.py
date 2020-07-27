@@ -7,11 +7,12 @@ import logging
 import numpy as np
 
 import torch
+import torchvision
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from data.loader import CAEDataset
+from data.loader import CFEXDataset
 from utils import *
 from losses import cae_loss
 
@@ -20,97 +21,107 @@ from torch.utils.tensorboard import SummaryWriter
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class Encoder_Decoder(nn.Module):
-    """Encoder network of CAE"""
 
-    def __init__(self,
-                 Encoder :bool = True,
-                 input_size: int = 13,
-                 output_size: int = 7,
-                 structure: list = [128],
-                 latent_dimension: int = 7,
-                 dropout: float = 0.0,
-                 batch_normalization: bool = False,
-                 activation="Sigmoid"):
+class Encoder(nn.Module):
+    """Encoder network of CFEX"""
 
-        super(Encoder_Decoder, self).__init__()
-        # self.n_inputs = input_size
-        # self.n_outputs = output_size
-        # self.n_latent = latent_dimension
+    def __init__(self):  # , model_arch: str="overfeat", pretrained: bool=True, refine: bool=True):
+        """:return tensor (batch_size, 512, 12, 12)"""
+        super(Encoder, self).__init__()
+        # if model_arch == "overfeat":
+        self.net = nn.Sequential(
+            nn.utils.spectral_norm(nn.Conv2d(in_channels=4, kernel_size=11, stride=4,
+                                             out_channels=96)),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(96),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.Conv2d(in_channels=96, out_channels=256,
+                                             kernel_size=5, stride=1)),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.Conv2d(in_channels=256, out_channels=512,
+                                             kernel_size=3, stride=1, padding=1)),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
+                                             kernel_size=3, stride=1, padding=1)),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
+                                             kernel_size=3, stride=1, padding=1)),
+        )
 
-        if activation == "Sigmoid" \
-                or activation == "Tanh" \
-                or activation == "LeakyRelu" \
-                or activation == "Relu":
-            pass
-
-        else:
-            raise "{} function is not supported".format(activation)
-
-        if Encoder:
-            structure.insert(0, input_size)
-
-        else:
-            structure.insert(0, latent_dimension)
-
-        # self.mlp = make_mlp(
-        #     layers=structure,
-        #     activation=activation,
-        #     dropout=dropout,
-        #     batch_normalization=batch_normalization
-        # )
-
-        nn_layers = []
-        for dim_in, dim_out in zip(structure[:-1], structure[1:]):
-            nn_layers.append(nn.Linear(dim_in, dim_out))
-            if activation == "Relu":
-                nn_layers.append(nn.ReLU())
-            elif activation == "LeakyRelu":
-                nn_layers.append(nn.LeakyReLU())
-            elif activation == "Sigmoid":
-                nn_layers.append(nn.Sigmoid())
-            elif activation == "Tanh":
-                nn_layers.append(nn.Tanh())
-            elif activation == "ELU":
-                nn_layers.append(nn.ELU())
-            if batch_normalization and dim_out != structure[-1]:
-                nn_layers.append(nn.BatchNorm1d(dim_out))
-            if dropout > 0:
-                nn_layers.append(nn.Dropout(p=dropout))
-
-        if Encoder:
-            # structure.insert(0, input_size)
-            # structure.append(latent_dimension)
-            nn_layers.append(nn.Linear(structure[-1], latent_dimension))
-
-        else:
-            # structure.insert(0, latent_dimension)
-            # structure.append(output_size)
-            nn_layers.append(nn.Linear(structure[-1], output_size))
-
-        self.mlp = nn.Sequential(*nn_layers)
+        # elif model_arch == "vgg":
+        #     vgg = torchvision.models.vgg11(pretrained=pretrained).features
+        #     for i, layer in enumerate(vgg.children()):
+        #         if isinstance(layer, nn.MaxPool2d):
+        #             vgg[i] = nn.AvgPool2d(kernel_size=2, stride=2, padding=0,
+        #                                   ceil_mode=False)
+        #         elif isinstance(layer, nn.ReLU):
+        #             vgg[i] = nn.LeakyReLU(inplace=True)
+        #
+        #     if refine:
+        #         for param in vgg.parameters():
+        #             param.requires_grad = True
+        #     else:
+        #         for param in vgg.parameters():
+        #             param.requires_grad = False
+        #
+        #     self.net = vgg
+        #
+        # else:
+        #     raise ValueError(f"Unrecognized model architecture {model_arch}")
 
     def forward(self, x):
-        return self.mlp(x)
+        return self.net(x)
 
 
-def make_cae(
+class Decoder(nn.Module):
+    """Encoder network of CFEX"""
+
+    def __init__(self):
+        super(Decoder, self).__init__()
+        # if model_arch == "overfeat":
+        self.net = nn.Sequential(
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, kernel_size=3, stride=2,
+                                                      out_channels=512)),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=512,
+                                                      kernel_size=3, stride=2)),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=256,
+                                                      kernel_size=3, stride=1, padding=1)),
+            # nn.MaxUnpool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=256, out_channels=96,
+                                                      kernel_size=3, stride=1, padding=1)),
+            # nn.MaxUnpool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(96),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=96,
+                                                      kernel_size=11, stride=2)),
+            nn.LeakyReLU(inplace=True),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=1,
+                                                      kernel_size=11, stride=2)),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+def make_cfex(
         dataloader_train,
         summary_writer,
-        save_dir:str = "save",
-        encoder_structure: list = [128, 128],
-        decoder_structure: list = [128, 128],
-        dropout: float = 0.0,
-        bn: bool = False,
-        input_size: int = 13,
-        output_size: int = 7,
-        latent_dim: int = 16,
+        save_dir: str = "save",
         iterations: int = 500,
-        activation: str = "Relu",
         learning_rate: float = 0.001,
         save_every_d_epochs: int = 50,
         ignore_first_epochs: int = 300
-        ):
+):
     """
     The following function returns the required cae to be further used in the next sections of the model
     If there is any saved model of cae, It loads according to the loading strategy otherwise it just
@@ -123,22 +134,9 @@ def make_cae(
     """
 
     # create the whole cae
-    encoder = Encoder_Decoder(Encoder=True,
-                              input_size=input_size,
-                              structure=encoder_structure,
-                              latent_dimension=latent_dim,
-                              dropout=dropout,
-                              activation=activation,
-                              batch_normalization=bn)
+    encoder = Encoder()
 
-    decoder = Encoder_Decoder(Encoder=False,
-                              input_size=input_size,
-                              output_size=output_size,
-                              structure=decoder_structure,
-                              latent_dimension=latent_dim,
-                              dropout=dropout,
-                              activation=activation,
-                              batch_normalization=bn)
+    decoder = Decoder()
 
     # Get the suitable device to run the model on
     device = get_device(logger)
@@ -158,7 +156,7 @@ def make_cae(
     logger.debug("Here is the decoder...")
     logger.debug(decoder)
 
-    # Load the CAE if available
+    # Load the CFEX if available
     loading_path = checkpoint_path(save_dir)
     if loading_path is not None:
         logger.info(f"Loading the model in {loading_path}...")
@@ -173,7 +171,7 @@ def make_cae(
         logger.debug("Done")
 
     else:
-        logger.info("No saved model for CAE, initializing...")
+        logger.info("No saved model for CFEX, initializing...")
         start_epoch = 0
         loss = torch.tensor([0])
         best_loss = np.inf
@@ -183,7 +181,7 @@ def make_cae(
         decoder.apply(init_weights)
 
     for epoch in range(start_epoch, start_epoch + iterations):
-        logger.debug("Training the CAE")
+        logger.debug("Training the CFEX")
         losses = []
         for i, samples in enumerate(dataloader_train, 1):
 
@@ -213,7 +211,7 @@ def make_cae(
                 print("samples", samples)
                 break
 
-        summary_writer.add_scalar("cae_loss", np.mean(losses), epoch)
+        summary_writer.add_scalar("cfex_loss", np.mean(losses), epoch)
         logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {np.mean(losses):.2f}")
 
         """
@@ -249,42 +247,30 @@ def make_cae(
 
     return encoder, decoder
 
+
 if __name__ == "__main__":
     # This section is for experimenting about the best latent dimension
     DIRECTORIES = config("Directories")
-    CAE = config("CAE")
+    CFEX = config("CFEX")
     GENERAL = config("System")
     TRAINING = config("Training")
 
     root = DIRECTORIES["data_root"]
-    cae_data = CAEDataset(root)
-    data_loader = DataLoader(cae_data,
-                             batch_size=int(CAE["batch_size"]),
+    cfex_data = CFEXDataset(root)
+    data_loader = DataLoader(cfex_data,
+                             batch_size=int(CFEX["batch_size"]),
                              num_workers=int(GENERAL["num_workers"]),
                              shuffle=True,
                              drop_last=True)
 
-    # Change this for experimenting other latent dims
-    latent_dim_list = [1, 2, 3, 4, 5, 6, 7, 8, 16, 32, 64]
-
-    for latent_dim in latent_dim_list:
-        summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_" + str(latent_dim)))
-        temp = os.path.join(DIRECTORIES["save_model"], "cae_test")
-        save_dir = os.path.join(temp, str(latent_dim))
-
-        make_cae(dataloader_train=data_loader,
-                 summary_writer=summary_writer_cae,
-                 save_dir=save_dir,
-                 encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
-                 decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
-                 dropout=float(CAE["dropout"]),
-                 bn=bool(CAE["batch_normalization"]),
-                 input_size=int(TRAINING["input_size"]),
-                 output_size=int(CAE["output_size"]),
-                 latent_dim=latent_dim,
-                 iterations=int(CAE["epochs"]),
-                 activation=str(CAE["activation"]),
-                 learning_rate=float(CAE["learning_rate"]),
-                 save_every_d_epochs=int(CAE["save_every_d_epochs"]),
-                 ignore_first_epochs=int(CAE["ignore_first_epochs"]))
-
+    # for latent_dim in latent_dim_list:
+    summary_writer_cfex = SummaryWriter(os.path.join(DIRECTORIES["log"], "cfex"))
+    save_dir = os.path.join(DIRECTORIES["save_model"], "cfex_train")
+    # save_dir = os.path.join(temp, str(latent_dim))
+    make_cfex(dataloader_train=data_loader,
+             summary_writer=summary_writer_cfex,
+             save_dir=save_dir,
+             iterations=int(CFEX["epochs"]),
+             learning_rate=float(CFEX["learning_rate"]),
+             save_every_d_epochs=int(CFEX["save_every_d_epochs"]),
+             ignore_first_epochs=int(CFEX["ignore_first_epochs"]))

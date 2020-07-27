@@ -1,17 +1,19 @@
 import torch
 import torch.nn as nn
 import torchvision
-import numpy as np
-import sys
+# import numpy as np
+# import sys
 import os
-from utils import *
 import logging
-from data.loader import CAEDataset
-import copy
+from utils import *
+from cfex import Encoder as CFEX
+# from data.loader import CAEDataset
+# import copy
 
 # The logger used for debugging
 logger = logging.getLogger(__name__)
 device = get_device(logger)
+DIRECTORIES = config("Directories")
 
 ##################################################################################
 #                                    Encoder
@@ -87,28 +89,9 @@ class ContextualFeatures(nn.Module):
         super(ContextualFeatures, self).__init__()
 
         if model_arch == "overfeat":
-            self.net = nn.Sequential(
-                nn.utils.spectral_norm(nn.Conv2d(in_channels=1, kernel_size=11, stride=4,
-                          out_channels=96)),
-                nn.AvgPool2d(kernel_size=2, stride=2),
-                nn.BatchNorm2d(96),
-                nn.LeakyReLU(inplace=True),
-                nn.utils.spectral_norm(nn.Conv2d(in_channels=96, out_channels=256,
-                          kernel_size=5, stride=1)),
-                nn.AvgPool2d(kernel_size=2, stride=2),
-                nn.BatchNorm2d(256),
-                nn.LeakyReLU(inplace=True),
-                nn.utils.spectral_norm(nn.Conv2d(in_channels=256, out_channels=512,
-                          kernel_size=3, stride=1, padding=1)),
-                nn.BatchNorm2d(512),
-                nn.LeakyReLU(inplace=True),
-                nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
-                          kernel_size=3, stride=1, padding=1)),
-                nn.BatchNorm2d(512),
-                nn.LeakyReLU(inplace=True),
-                nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
-                          kernel_size=3, stride=1, padding=1)),
-                                     )
+            self.net = CFEX.net
+            saving_dictionary = torch.load(os.path.join(DIRECTORIES["save_model"], "cfex/best.pt"))
+            self.net.load_state_dict(saving_dictionary["encoder"])
 
         elif model_arch == "vgg":
             vgg = torchvision.models.vgg11(pretrained=pretrained).features
@@ -292,12 +275,12 @@ class Decoder(nn.Module):
         decoder_output, state_tuple = self.decoder(fused_features.unsqueeze(0), state_tuple)
         curr_features_rel = self.hidden2pos(decoder_output[-1])
 
-        predicted_traj = last_features.clone()
-        predicted_traj_rel = last_features_rel
-        predicted_traj[:, :self._output_size] += curr_features_rel
+        # predicted_traj = last_features.clone()
+        # predicted_traj_rel = last_features_rel
+        # predicted_traj[:, :self._output_size] += curr_features_rel
         predicted_traj_rel = curr_features_rel
 
-        return predicted_traj, predicted_traj_rel, state_tuple
+        return predicted_traj_rel
 
 
 ##################################################################################
@@ -307,7 +290,7 @@ class GenerationUnit(nn.Module):
     """This class is responsible for generating just one frame"""
     def __init__(self, embedder, de_embedder, embedding_dim, encoder_h_dim, decoder_h_dim, input_size, output_size,
                  decoder_mlp_structure, decoder_mlp_activation, dropout, num_layers, fusion_pool_dim,
-                 fusion_hidden_dim, fused_vector_length: int = 80):
+                 fusion_hidden_dim, fused_vector_length: int = 64):
 
         super(GenerationUnit, self).__init__()
 
@@ -371,7 +354,7 @@ class GenerationUnit(nn.Module):
         # decoder_c = torch.zeros(self._num_layers,  batch_size, self._decoder_h_dim).to(device)
 
         decoder_output = self.decoder(obs[-1], obs_rel[-1], fused_features, (decoder_h, decoder_c))
-        return decoder_output[0], decoder_output[1]
+        return decoder_output
 
 
 class TrajectoryGenerator(nn.Module):
@@ -454,15 +437,13 @@ class TrajectoryGenerator(nn.Module):
 
         # Should be of the shape (batch_size, 1024, 12 * 12)
         context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
-        next_gu_rel = gu_input_rel
+        # next_gu_rel = gu_input_rel
         for i in range(self._seq_len):
-            predicted_features, predicted_features_rel = self.gu(obs=gu_input,
-                                                                 obs_rel=next_gu_rel,
-                                                                 context_features=context_features_sum)
+            predicted_features_rel = self.gu(obs=gu_input, obs_rel=gu_input_rel[i:], context_features=context_features_sum)
 
             # build the inputs for the next timestep
             gu_input_rel = torch.cat([gu_input_rel, predicted_features_rel.unsqueeze(0)], dim=0)
-            next_gu_rel = gu_input_rel[i:]
+            # next_gu_rel = gu_input_rel[i:]
             final_prediction_rel.append(predicted_features_rel)
             # final_prediction = torch.cat([final_prediction] + [predicted_features.unsqueeze(0)], dim=0)
             # gu_input = final_prediction[i:]
@@ -512,9 +493,9 @@ class TrajectoryDiscriminator(nn.Module):
 
         self.hidden_dim = encoder_h_dim                                        
         # because past and future has different dimensions and we want to keep their temporal relation
-        self.encoder_past = nn.LSTM(13, encoder_h_dim)                         
-        self.encoder_future = nn.LSTM(2, encoder_h_dim)                        
-        self.encoder_fuse = nn.LSTM(encoder_h_dim, encoder_h_dim)
+        # self.encoder_past = nn.LSTM(13, encoder_h_dim)
+        self.encoder = nn.LSTM(2, encoder_h_dim)
+        # self.encoder_fuse = nn.LSTM(encoder_h_dim, encoder_h_dim)
 
         nn_layers = []
         if mlp_structure[-1] != encoder_h_dim:
@@ -559,14 +540,14 @@ class TrajectoryDiscriminator(nn.Module):
             torch.zeros(1, batch, self.hidden_dim).to(device)                  
         )
 
-    def forward(self, traj_past, traj_future):
+    def forward(self, traj):
         # encoded_features = self.encoder(traj)
         # scores = self.classifier(encoded_features[0][0])
         # scores = self.classifier(traj)
         # return scores
-        _, (hidden_past, c_past) = self.encoder_past(traj_past, None)          
-        _, (hidden_future, _) = self.encoder_future(traj_future, (hidden_past, c_past))
-        _, hidden = self.encoder_fuse(torch.cat([hidden_past, hidden_future], dim=0), self.init_hidden(traj_past.size()[1]))
+        _, (hidden, c) = self.encoder(traj, None)
+        # _, (hidden_future, _) = self.encoder_future(traj_future, (hidden_past, c_past))
+        # _, hidden = self.encoder_fuse(torch.cat([hidden_past, hidden_future], dim=0), self.init_hidden(traj_past.size()[1]))
         scores = self.classifier(hidden[0].view(-1, self.hidden_dim))          
         return scores
 

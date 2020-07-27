@@ -40,6 +40,37 @@ class NuSceneDataset(Dataset):
         return loaded_data
 
 
+class CFEXDataset(Dataset):
+    """loading images for contextual feature extractor dataset loader"""
+
+    def __init__(self,  root_dir: str, test: bool = False):
+        """str root_dir: train_data root directory"""
+        if test:
+            data = os.path.join(root_dir, "val_data")
+        else:
+            data = os.path.join(root_dir, "train_data")
+
+        self.files = os.listdir(data)
+        self.files = [os.path.join(data, _path) for _path in self.files]
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        """
+        return desired train data with index idx.
+        :param int idx: train data index
+        :return: train data with index idx
+        """
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        loaded_data = torch.load(self.files[idx])
+        # make the timestep as the channel of the image. each sample has 4 images, therefore the channel is always 4
+        images = torch.cat(loaded_data["motion"], dim=0)
+        return images
+
+
 class CAEDataset(Dataset):
     """CAE dataloader separated from the model dataloader because of the input shape"""
 
