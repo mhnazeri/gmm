@@ -41,8 +41,7 @@ class NuSceneDataset(Dataset):
 
 
 class CFEXDataset(Dataset):
-    """loading images for contextual feature extractor dataset loader"""
-
+    """loading images for contextual feature extractor"""
     def __init__(self,  root_dir: str, test: bool = False):
         """str root_dir: train_data root directory"""
         if test:

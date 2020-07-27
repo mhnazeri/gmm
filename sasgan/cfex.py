@@ -34,20 +34,20 @@ class Encoder(nn.Module):
                                              out_channels=96)),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(96),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.Conv2d(in_channels=96, out_channels=256,
                                              kernel_size=5, stride=1)),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(256),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.Conv2d(in_channels=256, out_channels=512,
                                              kernel_size=3, stride=1, padding=1)),
             nn.BatchNorm2d(512),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
                                              kernel_size=3, stride=1, padding=1)),
             nn.BatchNorm2d(512),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
                                              kernel_size=3, stride=1, padding=1)),
         )
@@ -87,25 +87,25 @@ class Decoder(nn.Module):
             nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, kernel_size=3, stride=2,
                                                       out_channels=512)),
             nn.BatchNorm2d(512),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=512,
                                                       kernel_size=3, stride=2)),
             nn.BatchNorm2d(512),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=256,
                                                       kernel_size=3, stride=1, padding=1)),
             # nn.MaxUnpool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(256),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=256, out_channels=96,
                                                       kernel_size=3, stride=1, padding=1)),
             # nn.MaxUnpool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(96),
-            nn.LeakyReLU(inplace=True),
+            nn.Tanh(),
             nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=96,
                                                       kernel_size=11, stride=2)),
-            nn.LeakyReLU(inplace=True),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=1,
+            nn.Tanh(),
+            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=4,
                                                       kernel_size=11, stride=2)),
         )
 
@@ -201,6 +201,8 @@ def make_cfex(
 
             optimizer.zero_grad()
             loss.backward()
+            logger.debug(f"Encoder Grad Norm: {check_grad_norm(encoder)}")
+            logger.debug(f"Decoder Grad Norm: {check_grad_norm(decoder)}")
             optimizer.step()
 
             step += 1

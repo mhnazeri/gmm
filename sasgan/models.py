@@ -89,7 +89,7 @@ class ContextualFeatures(nn.Module):
         super(ContextualFeatures, self).__init__()
 
         if model_arch == "overfeat":
-            self.net = CFEX.net
+            self.net = CFEX()
             saving_dictionary = torch.load(os.path.join(DIRECTORIES["save_model"], "cfex/best.pt"))
             self.net.load_state_dict(saving_dictionary["encoder"])
 
@@ -431,15 +431,17 @@ class TrajectoryGenerator(nn.Module):
         # Return the shape of the inputs to the desired shapes for lstm layer to be encoded
         gu_input_rel = gu_input_rel.view(obs_length, batch_size, -1)
 
-        context_features = []
-        for i in range(obs_length):
-            context_features.append(self.context_features(frames[:, i]))
+        # context_features = []
+        # for i in range(obs_length):
+        #     context_features.append(self.context_features(frames[:, i]))
 
         # Should be of the shape (batch_size, 1024, 12 * 12)
-        context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
+        # context_features_sum = torch.stack(context_features, dim=0).sum(dim=0)
+        frames = frames.squeeze()
+        context_features = self.context_features(frames)
         # next_gu_rel = gu_input_rel
         for i in range(self._seq_len):
-            predicted_features_rel = self.gu(obs=gu_input, obs_rel=gu_input_rel[i:], context_features=context_features_sum)
+            predicted_features_rel = self.gu(obs=gu_input, obs_rel=gu_input_rel[i:], context_features=context_features)
 
             # build the inputs for the next timestep
             gu_input_rel = torch.cat([gu_input_rel, predicted_features_rel.unsqueeze(0)], dim=0)

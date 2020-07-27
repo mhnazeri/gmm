@@ -206,7 +206,7 @@ def main():
                 # real_predictions = d(batch["past"])
                 # add some noise to real data to confuse discriminator
                 # traj_gt = traj_gt * torch.randn_like(traj_gt)
-                real_predictions = d(batch["rel_past"], batch["rel_future"])
+                real_predictions = d(torch.cat([batch["rel_past"][:, :, :2], batch["rel_future"]], dim=0))
                 real_loss = bce_loss(real_predictions, true_labels)
                 # real_loss.backward()
                                                                                     
@@ -214,7 +214,7 @@ def main():
                 # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
                 # d_input_future = fake_traj.detach().permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
                 # traj_fake = torch.cat([d_input_past, d_input_future], dim=1)
-                fake_prediction = d(batch["rel_past"], fake_traj.detach())
+                fake_prediction = d(torch.cat([batch["rel_past"][:, :, :2], fake_traj.detach()], dim=0))
                 fake_loss = bce_loss(fake_prediction, fake_labels)
                 # fake_loss.backward()
 
@@ -241,7 +241,7 @@ def main():
             # d_input_past = batch["past"].permute(1, 0, 2).contiguous().view(batch["past"].size()[1], -1)
             # d_input_future_fake = fake_traj.permute(1, 0, 2).contiguous().view(batch["future"].size()[1], -1)
             # traj_fake = torch.cat([d_input_past, d_input_future_fake], dim=1)
-            fake_prediction = d(batch["rel_past"], fake_traj)
+            fake_prediction = d(torch.cat([batch["rel_past"][:, :, :2], fake_traj], dim=0))
 
             g_loss = bce_loss(fake_prediction, true_labels)
             g_loss.backward()
