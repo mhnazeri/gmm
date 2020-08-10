@@ -1,14 +1,12 @@
 """This module is responsible for loading of NuScene dataset
 """
 import os
+import random
 import argparse
 import logging
 import ujson as json
 import numpy as np
-import matplotlib.pyplot as plt
 from nuscenes.nuscenes import NuScenes
-import imageio
-import torch
 # from sasgan.data.traj_viz import render_scene_lidar
 
 
@@ -268,7 +266,7 @@ def move_samples(source: str, dest: str, portion: float, seed: int = 42):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('nuscenes', dest='nuscenes', type=str, help='set nuscenes directory')
+    parser.add_argument('nuscenes', type=str, help='set nuscenes directory')
     parser.add_argument('--source', dest='source', type=str, default="meta_data", help='source directory')
     parser.add_argument('--dest', dest='dest', type=str, default="meta_data_val", help='destination directory')
     parser.add_argument('--portion', dest='portion', type=float, default=0.01, help='what percentage of data should be used for testing')
@@ -281,8 +279,8 @@ if __name__ == "__main__":
     print("Start converting to json")
 
     for idx in range(len(nusc.scene)):
-        print(f"Convering scene {idx} from {len(nusc.scene)}")
+        print(f"Converting scene {idx} from {len(nusc.scene)}")
         extract_scene_data_as_json(nusc, idx, "meta_data")
 
     print("Conversion is completed")
-    move_samples(args.source, args.dest, args.portion, args.seed)
+    move_samples(arguments.source, arguments.dest, arguments.portion, arguments.seed)

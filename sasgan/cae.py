@@ -159,10 +159,10 @@ def make_cae(
     logger.debug(decoder)
 
     # Load the CAE if available
-    loading_path = checkpoint_path(save_dir)
+    loading_path = torch.load(save_dir)
     if loading_path is not None:
         logger.info(f"Loading the model in {loading_path}...")
-        saving_dictionary = torch.load(loading_path)
+        saving_dictionary = loading_path
         encoder.load_state_dict(saving_dictionary["encoder"])
         decoder.load_state_dict(saving_dictionary["decoder"])
         optimizer.load_state_dict(saving_dictionary["optimizer"])
@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
     for latent_dim in latent_dim_list:
         summary_writer_cae = SummaryWriter(os.path.join(DIRECTORIES["log"], "cae_" + str(latent_dim)))
-        temp = os.path.join(DIRECTORIES["save_model"], "cae_test")
+        temp = os.path.join(DIRECTORIES["save_model"], "cae/best.pt")
         save_dir = os.path.join(temp, str(latent_dim))
 
         make_cae(dataloader_train=data_loader,

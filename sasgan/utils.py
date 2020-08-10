@@ -19,8 +19,8 @@ def default_collate(batch):
         if key == "motion":
             stacked_list = []
             for item in batch:
-                stacked_images = torch.stack(item[key], dim=0).unsqueeze(dim=0)
-                stacked_images = stacked_images.expand(item["past"].shape[1], *stacked_images.shape[1:])
+                stacked_images = torch.stack(item[key], dim=0)
+                stacked_images = stacked_images.expand(item["past"].shape[1], *stacked_images.shape)
                 stacked_list.append(stacked_images)
 
             data[key] = torch.cat(stacked_list, dim=0)

@@ -1,13 +1,10 @@
 """General Helpers functions that can be used everywhere"""
 import os
 import argparse
-import random
-from collections import defaultdict
 import numpy as np
 from PIL import Image
 import ujson as json
 import torch
-from torch import Tensor
 from torchvision import transforms
 
 
@@ -142,9 +139,9 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
-    images = []
-    lidar = []
-    features = []
+    # images = []
+    # lidar = []
+    # features = []
     # read the list 13 element at a time
     num_features = [x for x in range(521) if x % 13 == 0]
     start_stop = list(zip(num_features[:], num_features[1:]))
@@ -157,58 +154,67 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
             _data = json.load(f)
 
         ego = _data[:-1]
-        lidar_address = []
+        # lidar_address = []
         camera_address = []
 
         for i in range(len(ego)):
-            lidar_address.append(ego[i]["lidar"])
+            # lidar_address.append(ego[i]["lidar"])
             camera_address.append(ego[i]["camera"])
         # for each file (scene), creates corresponding matrix
         features = create_feature_matrix(file, min_frames=min_frames)
         # create zero rows to reach the max agent number
         # dummy = torch.zeros(max_agent - len(features), 520)
         # features = torch.cat((features, dummy), 0)
+        # converting images to differences of consecutive frames
+        images = [transform(Image.open(os.path.join(nuscenes_root, address))) for address in camera_address]
+        images = [image_1 - image_0 for image_0, image_1 in zip(images[:-1], images[1:])]
+        features_rel = features[:, 13:] - features[:, :-13]
+        # skip first frame
+        features = features[:, 13:]
         data = {}
         stamp = 0
 
-        while stamp < 27:
+        while stamp < 26:
             past = []
+            past_rel = []
             future = []
-            image = []
+            future_rel = []
+            motion = []
             indices = cal_distance(features[:, start_stop[stamp][0]: start_stop[stamp][1]])
             for j in range(4):
                 # 4 frames in the past
                 # temp = features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]]
                 past.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices])
+                past_rel.append(features_rel[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices])
                 # each frame has an image
-                image.append(transform(Image.open(os.path.join(nuscenes_root, camera_address[stamp + j]))))
+                motion.append(images[stamp + j])
 
             for j in range(4, 14):
-                # 10 frames in the future
+                # 10 frames in the future (for future, choose only x and y)
                 # future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]])
-                # for future, choose only x and y
                 future.append(features[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices, :2])
+                future_rel.append(features_rel[:, start_stop[stamp + j][0]: start_stop[stamp + j][1]][indices, :2])
 
             # calculate background motion by subtracting two consecutive images
-            image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
+            # image = [img_2 - img_1 for img_1, img_2 in zip(image[:], image[1:])]
             # we only need 7 first features (translation, rotation) for relative history
             # a helper to slice out the 7 first features from each frame
             # rel_past = torch.cat(past, 1)
             # rel_past = [rel_past[:, i:i+7] for i in range(0,52,13)]
-            rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
-            # copy velocity and size from real past to relative past tensor
-            for i in range(3):
-                rel_past[i][7:] = past[i + 1][7:]
+            # rel_past = [past_2 - past_1 for past_1, past_2 in zip(past[:], past[1:])]
+            # copy agent's size from real past to relative past tensor
+            for i in range(4):
+                past_rel[i][:, 10:] = past[i][:, 10:]
 
             # if frame is at the beginning of a scene, add zero
-            if stamp == 0:
-                rel_past.insert(0, torch.zeros_like(past[0]))
-                image.insert(0, torch.zeros_like(image[0]))
-            else:
-                temp = past[0] - datum["past"]
-                temp[7:] = past[0][7:]
-                rel_past.insert(0, temp)
-                image.insert(0, image[0] - datum["motion"])
+            # if stamp == 0:
+            #     rel_past.insert(0, torch.zeros_like(past[0]))
+            #     image.insert(0, torch.zeros_like(image[0]))
+            # else:
+            #     temp = past[0] - datum["past"]
+            #     temp[7:] = past[0][7:]
+            #     rel_past.insert(0, temp)
+            #     image.insert(0, image[0] - datum["motion"])
 
             # removing zero frames
             # temp_past = torch.stack(past, dim=0)
@@ -218,19 +224,19 @@ def save_train_samples(nuscenes_root: str, root_dir: str, source: str,
             # print(not_zero_frames)
             # print(temp_past.size())
             # hold the info of the last frame of previos sample
-            datum = {}
-            datum["past"] = past[-1]
-            datum["motion"] = image[-1]
+            # datum = {}
+            # datum["past"] = past[-1]
+            # datum["motion"] = image[-1]
 
             data["past"] = torch.stack(past, dim=0)
             # rel_past = torch.stack(rel_past, dim=0)
-            data["rel_past"] = torch.stack(rel_past, dim=0)
-            data["motion"] = image
+            data["rel_past"] = torch.stack(past_rel, dim=0)
+            data["motion"] = motion
             # future = torch.stack(future, dim=0)
             data["future"] = torch.stack(future, dim=0)
-            rel_future = torch.cat([data["past"][-1, :, :2].unsqueeze(0), data["future"]], dim=0 )
-            rel_future = rel_future[1:, :, :] - rel_future[:-1, :, :]
-            data["rel_future"] = rel_future
+            # rel_future = torch.cat([data["past"][-1, :, :2].unsqueeze(0), data["future"]], dim=0 )
+            # rel_future = rel_future[1:, :, :] - rel_future[:-1, :, :]
+            data["rel_future"] = torch.stack(future_rel, dim=0)
 
             # save data on hard
             torch.save(data, os.path.join(save_dir, f"{index}.pt"))

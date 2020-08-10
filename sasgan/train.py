@@ -54,7 +54,7 @@ def get_cae():
 
     cae_encoder, cae_decoder = make_cae(dataloader_train=data_loader,
                                         summary_writer=summary_writer_cae,
-                                        save_dir=os.path.join(DIRECTORIES["save_model"], "cae"),
+                                        save_dir=os.path.join(DIRECTORIES["save_model"], "cae/best.pt"),
                                         encoder_structure=convert_str_to_list(CAE["encoder_structure"]),
                                         decoder_structure=convert_str_to_list(CAE["decoder_structure"]),
                                         dropout=float(CAE["dropout"]),
@@ -109,7 +109,9 @@ def main():
         fusion_pool_dim=int(GENERATOR["fusion_pool_dim"]),
         fusion_hidden_dim=int(GENERATOR["fusion_h_dim"]),
         context_feature_model_arch=str(GENERATOR["context_feature_model_arch"]),
-        num_layers=int(GENERATOR["num_layers"])
+        num_layers=int(GENERATOR["num_layers"]),
+        pretrain=bool(GENERATOR["pretrain_vgg"]),
+        refine=bool(GENERATOR["refine_cfex"])
     )
     logger.debug("Here is the generator...")
     logger.debug(g)
@@ -148,8 +150,8 @@ def main():
     # d.type(tensor_type)
 
     # defining the loss and optimizers for generator and discriminator
-    d_optimizer = torch.optim.Adam(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
-    g_optimizer = torch.optim.Adam(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
+    d_optimizer = torch.optim.AdamW(d.parameters(), lr=float(DISCRIMINATOR["learning_rate"]), betas=(0.5, 0.999))
+    g_optimizer = torch.optim.AdamW(g.parameters(), lr=float(GENERATOR["learning_rate"]), betas=(0.5, 0.999))
 
     # Loading the checkpoint if existing
     save_dir = os.path.join(DIRECTORIES["save_model"], "main_model")
@@ -377,9 +379,6 @@ def validate(g, device=None):
             logger.info(f"Loading the main model...")
             loaded_dictionary = torch.load(loading_path)
             g.load_state_dict(loaded_dictionary["generator"])
-            d.load_state_dict(loaded_dictionary["discriminator"])
-            g_optimizer.load_state_dict(loaded_dictionary["g_optimizer"])
-            d_optimizer.load_state_dict(loaded_dictionary["d_optimizer"])
             start_epoch = loaded_dictionary["epoch"] + 1
             step = loaded_dictionary["step"]
             best_ADE_loss = loaded_dictionary["best_ADE_loss"]

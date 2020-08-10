@@ -88,7 +88,7 @@ class CAEDataset(Dataset):
             # break
             for i in range(38):
                 self.features.append(l[:, (i+1)*13:(i+2)*13] - l[:, (i)*13:(i+1)*13])
-                self.features[-1][:, 7:] = l[:, (i+1)*13+7:(i+2)*13]
+                self.features[-1][:, 10:] = l[:, (i+1)*13+10:(i+2)*13]
 
         self.features = torch.cat(self.features, dim=0)
         self.features = self.features[torch.where(self.features.sum(axis=1) != 0)]
