@@ -1,10 +1,7 @@
 import os
 from typing import Dict
-import numpy as np
 import ujson as json
-from PIL import Image
 import torch
-from torchvision import transforms
 from torch.utils.data import Dataset
 from data.data_helpers import create_feature_matrix
 
@@ -14,7 +11,7 @@ class NuSceneDataset(Dataset):
     each sample is a dictionary with keys: past, rel_past, future, motion
     """
 
-    def __init__(self,  root_dir: str, test: bool = False):
+    def __init__(self, root_dir: str, test: bool = False):
         """str root_dir: train_data root directory"""
         if test:
             data = os.path.join(root_dir, "val_data")
@@ -42,7 +39,8 @@ class NuSceneDataset(Dataset):
 
 class CFEXDataset(Dataset):
     """loading images for contextual feature extractor"""
-    def __init__(self,  root_dir: str, test: bool = False):
+
+    def __init__(self, root_dir: str, test: bool = False):
         """str root_dir: train_data root directory"""
         if test:
             data = os.path.join(root_dir, "val_data")
@@ -83,19 +81,15 @@ class CAEDataset(Dataset):
         self.features = []
         for file in files:
             l = create_feature_matrix(file)
-            # print(l[0, :13], l[0, 13:26])
-            # print(l[0, 26:39], l[0, 39:52])
-            # break
             for i in range(38):
-                self.features.append(l[:, (i+1)*13:(i+2)*13] - l[:, (i)*13:(i+1)*13])
-                self.features[-1][:, 10:] = l[:, (i+1)*13+10:(i+2)*13]
+                self.features.append(
+                    l[:, (i + 1) * 13 : (i + 2) * 13] - l[:, (i) * 13 : (i + 1) * 13]
+                )
+                self.features[-1][:, 10:] = l[:, (i + 1) * 13 + 10 : (i + 2) * 13]
 
         self.features = torch.cat(self.features, dim=0)
         self.features = self.features[torch.where(self.features.sum(axis=1) != 0)]
         self.features = (self.features - self.features.mean()) / self.features.std()
-
-        # num_features = list(range(self.features.shape[1]))
-        # self.start_stop = list(zip(num_features[::13], num_features[13::13]))
 
     def __len__(self):
         return len(self.features)
@@ -130,20 +124,5 @@ class CAEDataset(Dataset):
         return lidar_address, camera_address
 
 
-if __name__ == '__main__':
-    data = NuSceneDataset("/home/nao/Projects/sasgan/sasgan/data/")
-    # data = CAEDataset("/home/nao/Projects/sasgan/sasgan/data/", "exported_json_data/scene-0061.json")
-    # data = DataLoader(data, batch_size=1, shuffle=True, num_workers=2, drop_last=True)
-    d = data.__getitem__(268)
-    print(len(data))
-    # print("len each data: ", len(d))
-    # # print(d["past"])
-    # print(type(d["motion"]))
-    # print(len(d["motion"]))
-    # print(type(d["motion"][0]))
-    # print(d["motion"][0].shape)
-    print(10*"-"+"past"+10*"-")
-    print(type(d["past"]))
-    print(len(d["past"]))
-    print(type(d["past"][0]))
-    print(d["past"][0].shape)
+if __name__ == "__main__":
+    pass

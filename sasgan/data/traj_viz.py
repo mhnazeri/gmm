@@ -13,7 +13,7 @@ from data_helpers import create_feature_matrix_for_viz
 # Defining Global variables
 fig, axes = plt.subplots(figsize=(18, 9))
 view = np.eye(4)
-ln, = plt.plot([], [], "b.", markersize=1)
+(ln,) = plt.plot([], [], "b.", markersize=1)
 nusc = NuScenes(version="v1.0-mini", dataroot="nuScene-mini", verbose=False)
 
 
@@ -22,8 +22,8 @@ def sample_extractor(nusc, idx_scene):
     sample = nusc.get("sample", nusc.scene[idx_scene]["first_sample_token"])
     _frames = []
     while sample["next"] != "":
-            _frames.append(nusc.get("sample", sample["token"]))
-            sample = nusc.get("sample", sample["next"])
+        _frames.append(nusc.get("sample", sample["token"]))
+        sample = nusc.get("sample", sample["next"])
 
     # Get last frame
     _frames.append(nusc.get("sample", sample["token"]))
@@ -74,18 +74,44 @@ def update(*frames):
             # agent_future -= np.tile(np.array(calibre[0]), 3)
             print(agent_past)
             # plotting ego
-            axes.scatter(data["past"][0][::2], data["past"][0][1::2], marker='d', label="Past", color="blue")
-            axes.scatter(data["future"][0][::2], data["future"][0][1::2], marker='s', label="Future", color="green")
+            axes.scatter(
+                data["past"][0][::2],
+                data["past"][0][1::2],
+                marker="d",
+                label="Past",
+                color="blue",
+            )
+            axes.scatter(
+                data["future"][0][::2],
+                data["future"][0][1::2],
+                marker="s",
+                label="Future",
+                color="green",
+            )
             # plotting other agents
-            axes.scatter(agent_past[::2], agent_past[1::2], marker='d', label="Past", color="blue")
-            axes.scatter(agent_future[::2], agent_future[1::2], marker='s', label="Future", color="green")
+            axes.scatter(
+                agent_past[::2],
+                agent_past[1::2],
+                marker="d",
+                label="Past",
+                color="blue",
+            )
+            axes.scatter(
+                agent_future[::2],
+                agent_future[1::2],
+                marker="s",
+                label="Future",
+                color="green",
+            )
 
             # axes_limit = 53
             # axes.set_xlim(-axes_limit, axes_limit)
             # axes.set_ylim(-axes_limit, axes_limit)
 
         for ann in lidar["anns"]:
-            data_path, boxes, _ = nusc.get_sample_data(lidar["data"]["LIDAR_TOP"], selected_anntokens=[ann])
+            data_path, boxes, _ = nusc.get_sample_data(
+                lidar["data"]["LIDAR_TOP"], selected_anntokens=[ann]
+            )
 
             for box in boxes:
                 c = np.array(_get_color(box.name)) / 255.0
@@ -94,20 +120,20 @@ def update(*frames):
                 corners = _view_points(boxes[0].corners(), view)[:2, :]
                 axes.set_xlim([np.min(corners[0, :]) - 10, np.max(corners[0, :]) + 10])
                 axes.set_ylim([np.min(corners[1, :]) - 10, np.max(corners[1, :]) + 10])
-                axes.axis('off')
-                axes.set_aspect('equal')
+                axes.axis("off")
+                axes.set_aspect("equal")
 
     global frame
     frame = LidarPointCloud.from_file(data_path)
     frame.render_height(axes, view=np.eye(4))
 
     global data_
-    data_ = _view_points(frame.points[:3,:], np.eye(4))
+    data_ = _view_points(frame.points[:3, :], np.eye(4))
 
     xdata = data_[0, :]
     ydata = data_[1, :]
     ln.set_data(xdata, ydata)
-    return ln,
+    return (ln,)
 
 
 def _view_points(points, view):
@@ -116,7 +142,7 @@ def _view_points(points, view):
     assert points.shape[0] == 3
 
     viewpad = np.eye(4)
-    viewpad[:view.shape[0], :view.shape[1]] = view
+    viewpad[: view.shape[0], : view.shape[1]] = view
 
     nbr_points = points.shape[1]
 
@@ -127,11 +153,13 @@ def _view_points(points, view):
 
     return points
 
+
 def init():
     axes.set_xlim(-20, 20)
     axes.set_ylim(-20, 20)
     ln.set_data([], [])
-    return ln,
+    return (ln,)
+
 
 def _get_color(category_name: str):
     """
@@ -158,23 +186,44 @@ def _get_color(category_name: str):
 
 def render_scene_lidar(nusc, idx_scene=0, save_path=None, blit=False):
     scene_data = sample_extractor(nusc, idx_scene)
-    feature_matrix, calibrated_features = create_feature_matrix_for_viz("exported_json_data/scene-0061.json")
+    feature_matrix, calibrated_features = create_feature_matrix_for_viz(
+        "exported_json_data/scene-0061.json"
+    )
     lidar = []
     num_features = list(range(121))
     start_stop = list(zip(num_features[::2], num_features[2::2]))
 
     for idx in range(2, 37):
         data = {}
-        data["past"] = feature_matrix[:, start_stop[idx-2][0]: start_stop[idx-2][1]]
-        data["past"] = np.concatenate((data["past"], feature_matrix[:, start_stop[idx-1][0]: start_stop[idx-1][1]]), 1)
-        data["now"] = feature_matrix[:, start_stop[idx][0]: start_stop[idx][1]]
-        data["future"] = feature_matrix[:, start_stop[idx+1][0]: start_stop[idx+1][1]]
-        data["future"] = np.concatenate((data["future"], feature_matrix[:, start_stop[idx+2][0]: start_stop[idx+2][1]]), 1)
-        data["future"] = np.concatenate((data["future"], feature_matrix[:, start_stop[idx+3][0]: start_stop[idx+3][1]]), 1)
-        lidar.append((scene_data[idx],
-            data,
-            calibrated_features[idx])
+        data["past"] = feature_matrix[
+            :, start_stop[idx - 2][0] : start_stop[idx - 2][1]
+        ]
+        data["past"] = np.concatenate(
+            (
+                data["past"],
+                feature_matrix[:, start_stop[idx - 1][0] : start_stop[idx - 1][1]],
+            ),
+            1,
         )
+        data["now"] = feature_matrix[:, start_stop[idx][0] : start_stop[idx][1]]
+        data["future"] = feature_matrix[
+            :, start_stop[idx + 1][0] : start_stop[idx + 1][1]
+        ]
+        data["future"] = np.concatenate(
+            (
+                data["future"],
+                feature_matrix[:, start_stop[idx + 2][0] : start_stop[idx + 2][1]],
+            ),
+            1,
+        )
+        data["future"] = np.concatenate(
+            (
+                data["future"],
+                feature_matrix[:, start_stop[idx + 3][0] : start_stop[idx + 3][1]],
+            ),
+            1,
+        )
+        lidar.append((scene_data[idx], data, calibrated_features[idx]))
 
     # feature_matrix = zip(feature_matrix[:][: 6: 6],
     #                      feature_matrix[:][6: 21: 15])
@@ -188,6 +237,7 @@ def render_scene_lidar(nusc, idx_scene=0, save_path=None, blit=False):
         ani.save(save_path + str(idx_scene) + ".mp4")
     # commented for computational reasons
     # plt.show()
+
 
 if __name__ == "__main__":
     # feature_matrix = create_feature_matrix_for_viz("exported_json_data/scene-" + "0061.json").numpy()

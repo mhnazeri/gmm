@@ -25,53 +25,54 @@ logging.basicConfig(level=logging.INFO)
 class Encoder(nn.Module):
     """Encoder network of CFEX"""
 
-    def __init__(self):  # , model_arch: str="overfeat", pretrained: bool=True, refine: bool=True):
+    def __init__(self):
         """:return tensor (batch_size, 512, 12, 12)"""
         super(Encoder, self).__init__()
-        # if model_arch == "overfeat":
         self.net = nn.Sequential(
-            nn.utils.spectral_norm(nn.Conv2d(in_channels=4, kernel_size=11, stride=4,
-                                             out_channels=96)),
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_channels=4, kernel_size=11, stride=4, out_channels=96)
+            ),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(96),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.Conv2d(in_channels=96, out_channels=256,
-                                             kernel_size=5, stride=1)),
+            nn.utils.spectral_norm(
+                nn.Conv2d(in_channels=96, out_channels=256, kernel_size=5, stride=1)
+            ),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(256),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.Conv2d(in_channels=256, out_channels=512,
-                                             kernel_size=3, stride=1, padding=1)),
+            nn.utils.spectral_norm(
+                nn.Conv2d(
+                    in_channels=256,
+                    out_channels=512,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            ),
             nn.BatchNorm2d(512),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
-                                             kernel_size=3, stride=1, padding=1)),
+            nn.utils.spectral_norm(
+                nn.Conv2d(
+                    in_channels=512,
+                    out_channels=512,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            ),
             nn.BatchNorm2d(512),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.Conv2d(in_channels=512, out_channels=512,
-                                             kernel_size=3, stride=1, padding=1)),
+            nn.utils.spectral_norm(
+                nn.Conv2d(
+                    in_channels=512,
+                    out_channels=512,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            ),
         )
-
-        # elif model_arch == "vgg":
-        #     vgg = torchvision.models.vgg11(pretrained=pretrained).features
-        #     for i, layer in enumerate(vgg.children()):
-        #         if isinstance(layer, nn.MaxPool2d):
-        #             vgg[i] = nn.AvgPool2d(kernel_size=2, stride=2, padding=0,
-        #                                   ceil_mode=False)
-        #         elif isinstance(layer, nn.ReLU):
-        #             vgg[i] = nn.LeakyReLU(inplace=True)
-        #
-        #     if refine:
-        #         for param in vgg.parameters():
-        #             param.requires_grad = True
-        #     else:
-        #         for param in vgg.parameters():
-        #             param.requires_grad = False
-        #
-        #     self.net = vgg
-        #
-        # else:
-        #     raise ValueError(f"Unrecognized model architecture {model_arch}")
 
     def forward(self, x):
         return self.net(x)
@@ -84,29 +85,49 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         # if model_arch == "overfeat":
         self.net = nn.Sequential(
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, kernel_size=3, stride=2,
-                                                      out_channels=512)),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=512, kernel_size=3, stride=2, out_channels=512
+                )
+            ),
             nn.BatchNorm2d(512),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=512,
-                                                      kernel_size=3, stride=2)),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=512, out_channels=512, kernel_size=3, stride=2
+                )
+            ),
             nn.BatchNorm2d(512),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=512, out_channels=256,
-                                                      kernel_size=3, stride=1, padding=1)),
-            # nn.MaxUnpool2d(kernel_size=2, stride=2),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=512,
+                    out_channels=256,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            ),
             nn.BatchNorm2d(256),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=256, out_channels=96,
-                                                      kernel_size=3, stride=1, padding=1)),
-            # nn.MaxUnpool2d(kernel_size=2, stride=2),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=256, out_channels=96, kernel_size=3, stride=1, padding=1
+                )
+            ),
             nn.BatchNorm2d(96),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=96,
-                                                      kernel_size=11, stride=2)),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=96, out_channels=96, kernel_size=11, stride=2
+                )
+            ),
             nn.Tanh(),
-            nn.utils.spectral_norm(nn.ConvTranspose2d(in_channels=96, out_channels=4,
-                                                      kernel_size=11, stride=2)),
+            nn.utils.spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels=96, out_channels=4, kernel_size=11, stride=2
+                )
+            ),
         )
 
     def forward(self, x):
@@ -114,13 +135,13 @@ class Decoder(nn.Module):
 
 
 def make_cfex(
-        dataloader_train,
-        summary_writer,
-        save_dir: str = "save",
-        iterations: int = 500,
-        learning_rate: float = 0.001,
-        save_every_d_epochs: int = 50,
-        ignore_first_epochs: int = 300
+    dataloader_train,
+    summary_writer,
+    save_dir: str = "save",
+    iterations: int = 500,
+    learning_rate: float = 0.001,
+    save_every_d_epochs: int = 50,
+    ignore_first_epochs: int = 300,
 ):
     """
     The following function returns the required cae to be further used in the next sections of the model
@@ -214,7 +235,9 @@ def make_cfex(
                 break
 
         summary_writer.add_scalar("cfex_loss", np.mean(losses), epoch)
-        logger.info(f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {np.mean(losses):.2f}")
+        logger.info(
+            f"TRAINING [{(epoch + 1):3d} / {(start_epoch + iterations)}]\t loss: {np.mean(losses):.2f}"
+        )
 
         """
         The model will be saved in three circumstances: 
@@ -223,9 +246,11 @@ def make_cfex(
           3. after the final iteration
         """
 
-        if (best_loss <= np.mean(losses) and epoch > ignore_first_epochs) or \
-                (epoch + 1) % save_every_d_epochs == 0 or \
-                (epoch + 1) == start_epoch + iterations:
+        if (
+            (best_loss <= np.mean(losses) and epoch > ignore_first_epochs)
+            or (epoch + 1) % save_every_d_epochs == 0
+            or (epoch + 1) == start_epoch + iterations
+        ):
             checkpoint = {
                 "epoch": epoch,
                 "step": step,
@@ -242,7 +267,9 @@ def make_cfex(
 
             else:
                 logger.info(f"Saving the model (intervals)...")
-                torch.save(checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt")
+                torch.save(
+                    checkpoint, save_dir + "/checkpoint-" + str(epoch + 1) + ".pt"
+                )
 
     encoder.requires_grad_(False)
     decoder.requires_grad_(False)
@@ -259,20 +286,23 @@ if __name__ == "__main__":
 
     root = DIRECTORIES["data_root"]
     cfex_data = CFEXDataset(root)
-    data_loader = DataLoader(cfex_data,
-                             batch_size=int(CFEX["batch_size"]),
-                             num_workers=int(GENERAL["num_workers"]),
-                             shuffle=True,
-                             drop_last=True)
+    data_loader = DataLoader(
+        cfex_data,
+        batch_size=int(CFEX["batch_size"]),
+        num_workers=int(GENERAL["num_workers"]),
+        shuffle=True,
+        drop_last=True,
+    )
 
     # for latent_dim in latent_dim_list:
     summary_writer_cfex = SummaryWriter(os.path.join(DIRECTORIES["log"], "cfex"))
     save_dir = os.path.join(DIRECTORIES["save_model"], "cfex_train")
-    # save_dir = os.path.join(temp, str(latent_dim))
-    make_cfex(dataloader_train=data_loader,
-             summary_writer=summary_writer_cfex,
-             save_dir=save_dir,
-             iterations=int(CFEX["epochs"]),
-             learning_rate=float(CFEX["learning_rate"]),
-             save_every_d_epochs=int(CFEX["save_every_d_epochs"]),
-             ignore_first_epochs=int(CFEX["ignore_first_epochs"]))
+    make_cfex(
+        dataloader_train=data_loader,
+        summary_writer=summary_writer_cfex,
+        save_dir=save_dir,
+        iterations=int(CFEX["epochs"]),
+        learning_rate=float(CFEX["learning_rate"]),
+        save_every_d_epochs=int(CFEX["save_every_d_epochs"]),
+        ignore_first_epochs=int(CFEX["ignore_first_epochs"]),
+    )

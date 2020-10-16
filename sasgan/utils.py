@@ -20,7 +20,9 @@ def default_collate(batch):
             stacked_list = []
             for item in batch:
                 stacked_images = torch.stack(item[key], dim=0)
-                stacked_images = stacked_images.expand(item["past"].shape[1], *stacked_images.shape)
+                stacked_images = stacked_images.expand(
+                    item["past"].shape[1], *stacked_images.shape
+                )
                 stacked_list.append(stacked_images)
 
             data[key] = torch.cat(stacked_list, dim=0)
@@ -54,9 +56,8 @@ def get_device(logger, use_gpu=True):
     return device
 
 
-def config(module_name: str=None) -> Dict[str, str]:
+def config(module_name: str = None) -> Dict[str, str]:
     """
-    To be completed by mohammad
     :param module_name:
     :return:
     """
@@ -65,11 +66,10 @@ def config(module_name: str=None) -> Dict[str, str]:
     try:
         return config[module_name]
     except KeyError as err:
-        print(f"Module name should be one of the:\n "
-              f"{config.sections()} not {err}")
+        print(f"Module name should be one of the:\n " f"{config.sections()} not {err}")
 
 
-def _get_loading_strategy(model_type:str = "main"):
+def _get_loading_strategy(model_type: str = "main"):
     """
     returns the loading strategy based on what model queried
     :param model_type: cae or main
@@ -100,9 +100,13 @@ def checkpoint_path(path):
             processed_path["best"] = dir
 
         elif "checkpoint" in dir:
-            processed_path["checkpoint"].append(tuple((dir.split(sep="-")[1].split(sep=".")[0], dir)))
+            processed_path["checkpoint"].append(
+                tuple((dir.split(sep="-")[1].split(sep=".")[0], dir))
+            )
 
-    loading_strategy = _get_loading_strategy("cae") if "cae" in path else _get_loading_strategy("main")
+    loading_strategy = (
+        _get_loading_strategy("cae") if "cae" in path else _get_loading_strategy("main")
+    )
 
     if len(processed_path["checkpoint"]) == 0 and "best" not in processed_path:
         return None
@@ -117,7 +121,9 @@ def checkpoint_path(path):
 
         # Finding the last saved_checkpoint
         directories_list = np.asarray(processed_path["checkpoint"], dtype=object)
-        return os.path.join(path, directories_list[directories_list[:, 0].astype(np.int).argmax(), 1])
+        return os.path.join(
+            path, directories_list[directories_list[:, 0].astype(np.int).argmax(), 1]
+        )
 
     else:
         return None
@@ -134,10 +140,12 @@ def get_tensor_type(use_gpu=True):
         return torch.FloatTensor
 
 
-def make_mlp(layers: list,
-             activation: str = "Relu",
-             dropout: float = 0.0,
-             batch_normalization: bool = True):
+def make_mlp(
+    layers: list,
+    activation: str = "Relu",
+    dropout: float = 0.0,
+    batch_normalization: bool = True,
+):
     """
     Makes a mlp with the specified inputs
     :param layers: a list containing the dimensions of the linear layers
@@ -167,7 +175,7 @@ def make_mlp(layers: list,
 
 
 def convert_str_to_list(string_list):
-    return [int(item.strip()) for item in string_list.strip('][').split(",")]
+    return [int(item.strip()) for item in string_list.strip("][").split(",")]
 
 
 def relative_to_abs(rel_traj, start_pos):
@@ -188,11 +196,11 @@ def relative_to_abs(rel_traj, start_pos):
 
 def check_grad_norm(net):
     """Computes the grad norm of all parameters of the network"""
-    total_norm = 0                                               
-    for p in list(filter(lambda p: p.grad is not None, net.parameters())): 
-        param_norm = p.grad.data.norm(2)                         
-        total_norm += param_norm.item() ** 2                     
-    total_norm = total_norm ** (1. / 2)                          
+    total_norm = 0
+    for p in list(filter(lambda p: p.grad is not None, net.parameters())):
+        param_norm = p.grad.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** (1.0 / 2)
     return total_norm
 
 
@@ -200,6 +208,7 @@ def timeit_cuda(fn):
     """A function decorator to calculate the time a funcion needed for completion on GPU.
     returns: the function result and the time taken
     """
+
     @functools.wraps(func)
     def wrapper_fn(*args, **kwargs):
         torch.cuda.synchronize()
@@ -213,8 +222,5 @@ def timeit_cuda(fn):
     return wrapper_fn
 
 
-if __name__ == '__main__':
-    cae_config = config("CAE")
-    print(cae_config["latent_dim"])
-    # print(cae_config.latent_dim)
-
+if __name__ == "__main__":
+    pass

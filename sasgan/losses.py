@@ -1,5 +1,4 @@
 import torch
-import random
 
 
 def bce_loss(input, target):
@@ -8,44 +7,9 @@ def bce_loss(input, target):
     :param target: The target tensor of shape [Btach_size]
     :return: The binary cross entropy loss
     """
-    # neg_abs = -input.abs()
-    # focal loss
-    # loss = input.clamp(min=0) - input * target + ((neg_abs.exp()).pow(2) * (1 + neg_abs.exp()).log())
-    # loss = input.clamp(min=0) - input * target + (1 + neg_abs.exp()).log()
     bce = torch.nn.BCEWithLogitsLoss()
-    # sigmoid = torch.nn.Sigmoid()
     loss = bce(input.squeeze(), target)
-
-    # return loss.mean()
     return loss
-
-
-# def gan_g_loss(scores_fake):
-#     """
-#     Input:
-#     - scores_fake: Tensor of shape (N,) containing scores for fake samples
-#
-#     Output:
-#     - loss: Tensor of shape (,) giving GAN generator loss
-#     """
-#     y_fake = torch.ones_like(scores_fake) * random.uniform(0.7, 1.2)
-#     return bce_loss(scores_fake, y_fake)
-#
-#
-# def gan_d_loss(scores_real, scores_fake):
-#     """
-#     Input:
-#     - scores_real: Tensor of shape (N,) giving scores for real samples
-#     - scores_fake: Tensor of shape (N,) giving scores for fake samples
-#
-#     Output:
-#     - loss: Tensor of shape (,) giving GAN discriminator loss
-#     """
-#     y_real = torch.ones_like(scores_real) * random.uniform(0.7, 1.2)
-#     y_fake = torch.ones_like(scores_fake) * random.uniform(0, 0.3)
-#     loss_real = bce_loss(scores_real, y_real)
-#     loss_fake = bce_loss(scores_fake, y_fake)
-#     return loss_real + loss_fake
 
 
 def displacement_error(pred_traj, pred_traj_gt, consider_ped=None):
@@ -121,7 +85,9 @@ def cae_loss(output_encoder, outputs, inputs, device, lamda=1e-4):
     ), f"outputs.shape : {outputs.shape} != inputs.shape : {inputs.shape}"
 
     loss1 = criterion(outputs, inputs)
-    output_encoder.backward(torch.ones(output_encoder.size()).to(device), retain_graph=True)
+    output_encoder.backward(
+        torch.ones(output_encoder.size()).to(device), retain_graph=True
+    )
     inputs.grad.requires_grad = True
     loss2 = torch.sqrt(torch.sum(torch.pow(inputs.grad, 2)))
     inputs.grad.data.zero_()

@@ -1,4 +1,4 @@
-PyTorch implementation of " " paper.
+PyTorch implementation of GMM-TF.
 
 ## Dependencies
 The main dependencies are PyTorch and nuScenes devkit. You can install other dependencies by running:
