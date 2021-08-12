@@ -1,5 +1,9 @@
 PyTorch implementation of GMM-TF.
 
+<p align="center">
+  <img src="gmm.svg"  height="400" width="600"/>
+</p>
+
 ## Dependencies
 The main dependencies are PyTorch and nuScenes devkit. You can install other dependencies by running:
 ```bash
